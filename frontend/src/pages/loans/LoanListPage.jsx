@@ -1,5 +1,6 @@
 import loanApi from '../../api/loanApi.js'
 import DataTable from '../../components/DataTable.jsx'
+import PageHead from '../../components/PageHead.jsx'
 import PageState from '../../components/PageState.jsx'
 import StatusBadge from '../../components/StatusBadge.jsx'
 import useFetch from '../../hooks/useFetch.js'
@@ -20,10 +21,10 @@ export default function LoanListPage() {
 
   return (
     <section>
-      <h2>Mượn / Trả sách</h2>
-      {/* TODO: form mượn sách + nút trả sách */}
+      <PageHead title="Mượn và trả" subtitle="Các phiếu mượn gần đây." />
+      {/* TODO: form cho mượn + nhận trả sách */}
       <PageState loading={loading} error={error}>
-        <DataTable columns={columns} rows={data} />
+        <DataTable columns={columns} rows={data} emptyText="Chưa có phiếu mượn nào." />
       </PageState>
     </section>
   )

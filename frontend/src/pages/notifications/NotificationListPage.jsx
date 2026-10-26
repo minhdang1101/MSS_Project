@@ -1,5 +1,6 @@
 import notificationApi from '../../api/notificationApi.js'
 import DataTable from '../../components/DataTable.jsx'
+import PageHead from '../../components/PageHead.jsx'
 import PageState from '../../components/PageState.jsx'
 import StatusBadge from '../../components/StatusBadge.jsx'
 import useFetch from '../../hooks/useFetch.js'
@@ -18,9 +19,9 @@ export default function NotificationListPage() {
 
   return (
     <section>
-      <h2>Thông báo</h2>
+      <PageHead title="Nhắc hạn" subtitle="Lịch gửi tin nhắn và email cho từng lượt mượn." />
       <PageState loading={loading} error={error}>
-        <DataTable columns={columns} rows={data} />
+        <DataTable columns={columns} rows={data} emptyText="Chưa có lời nhắc nào." />
       </PageState>
     </section>
   )

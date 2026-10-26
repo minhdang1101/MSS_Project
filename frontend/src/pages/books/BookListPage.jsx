@@ -1,16 +1,25 @@
 import bookApi from '../../api/bookApi.js'
 import DataTable from '../../components/DataTable.jsx'
+import PageHead from '../../components/PageHead.jsx'
 import PageState from '../../components/PageState.jsx'
 import StatusBadge from '../../components/StatusBadge.jsx'
 import useFetch from '../../hooks/useFetch.js'
 
 const columns = [
-  { key: 'isbn', label: 'ISBN' },
-  { key: 'title', label: 'Tên sách' },
-  { key: 'author', label: 'Tác giả' },
+  {
+    key: 'title',
+    label: 'Sách',
+    render: (b) => (
+      <div>
+        <div className="title">{b.title}</div>
+        <div className="meta">{b.author}</div>
+      </div>
+    ),
+  },
+  { key: 'isbn', label: 'ISBN', render: (b) => <span className="meta">{b.isbn}</span> },
   { key: 'format', label: 'Định dạng' },
-  { key: 'availableCopies', label: 'Còn lại', render: (b) => `${b.availableCopies}/${b.totalCopies}` },
-  { key: 'status', label: 'Trạng thái', render: (b) => <StatusBadge status={b.status} /> },
+  { key: 'availableCopies', label: 'Còn sẵn', num: true, render: (b) => `${b.availableCopies} / ${b.totalCopies}` },
+  { key: 'status', label: 'Tình trạng', render: (b) => <StatusBadge status={b.status} /> },
 ]
 
 export default function BookListPage() {
@@ -18,9 +27,9 @@ export default function BookListPage() {
 
   return (
     <section>
-      <h2>Danh mục sách</h2>
+      <PageHead title="Danh mục sách" subtitle="Bản in trên kệ và giấy phép sách điện tử." />
       <PageState loading={loading} error={error}>
-        <DataTable columns={columns} rows={data} />
+        <DataTable columns={columns} rows={data} emptyText="Chưa có đầu sách nào trong danh mục." />
       </PageState>
     </section>
   )

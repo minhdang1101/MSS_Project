@@ -1,28 +1,41 @@
-import { NavLink, Outlet } from 'react-router-dom'
+import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext.jsx'
 
 const NAV_ITEMS = [
-  { to: '/', label: 'Tổng quan', end: true },
-  { to: '/books', label: 'Sách' },
+  { to: '/', label: 'Hôm nay', end: true },
+  { to: '/loans', label: 'Mượn và trả' },
+  { to: '/books', label: 'Danh mục sách' },
   { to: '/members', label: 'Thành viên' },
-  { to: '/loans', label: 'Mượn / Trả' },
   { to: '/fines', label: 'Tiền phạt' },
-  { to: '/notifications', label: 'Thông báo' },
+  { to: '/notifications', label: 'Nhắc hạn' },
 ]
 
 export default function MainLayout() {
+  const { user, logout } = useAuth()
+  const navigate = useNavigate()
+
+  const handleLogout = () => {
+    logout()
+    navigate('/login', { replace: true })
+  }
+
   return (
-    <div className="layout">
-      <aside className="sidebar">
-        <h1 className="brand">Digital Library</h1>
-        <nav>
+    <div className="app">
+      <aside className="rail">
+        <div className="brand">Quản lý thư viện<small>Quầy thủ thư</small></div>
+        <nav className="nav" aria-label="Điều hướng chính">
           {NAV_ITEMS.map((item) => (
-            <NavLink key={item.to} to={item.to} end={item.end} className="nav-link">
+            <NavLink key={item.to} to={item.to} end={item.end}>
               {item.label}
             </NavLink>
           ))}
         </nav>
+        <div className="who">
+          <b>{user ?? 'Thủ thư'}</b>Thủ thư
+          <button className="logout" type="button" onClick={handleLogout}>Đăng xuất</button>
+        </div>
       </aside>
-      <main className="content">
+      <main>
         <Outlet />
       </main>
     </div>
