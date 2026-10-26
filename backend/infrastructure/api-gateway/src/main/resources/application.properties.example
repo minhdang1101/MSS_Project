@@ -5,8 +5,8 @@ eureka.client.service-url.defaultZone=http://localhost:8761/eureka/
 
 # ===== JWT (HMAC-SHA256 shared secret) =====
 app.security.jwt.secret=your_jwt_secret_at_least_32_characters
-# Set to true once an auth/login flow issues tokens
-app.security.enabled=false
+# JWTs are issued by member-service at POST /api/auth/login
+app.security.enabled=true
 
 # ===== CORS (React dev server) =====
 app.cors.allowed-origins=http://localhost:5173
@@ -29,3 +29,7 @@ spring.cloud.gateway.server.webflux.routes[4].uri=lb://notification-service
 spring.cloud.gateway.server.webflux.routes[4].predicates[0]=Path=/api/notifications/**
 
 management.endpoints.web.exposure.include=health,info,gateway
+
+spring.cloud.gateway.server.webflux.routes[5].id=auth
+spring.cloud.gateway.server.webflux.routes[5].uri=lb://member-service
+spring.cloud.gateway.server.webflux.routes[5].predicates[0]=Path=/api/auth/**

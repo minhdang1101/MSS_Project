@@ -22,7 +22,12 @@ import java.util.List;
 @EnableWebFluxSecurity
 public class SecurityConfig {
 
-    @Value("${app.security.enabled:false}")
+    private static final int MIN_SECRET_BYTES = 32;
+    /** The value shipped in application.properties.example; publicly known, so never acceptable. */
+    private static final String EXAMPLE_SECRET = "your_jwt_secret_at_least_32_characters";
+
+    /** Defaults to true: forgetting the property must not leave every endpoint open. */
+    @Value("${app.security.enabled:true}")
     private boolean securityEnabled;
 
     @Value("${app.security.jwt.secret}")
@@ -52,6 +57,14 @@ public class SecurityConfig {
 
     @Bean
     public ReactiveJwtDecoder jwtDecoder() {
+        if (jwtSecret.getBytes(StandardCharsets.UTF_8).length < MIN_SECRET_BYTES) {
+            throw new IllegalStateException("app.security.jwt.secret must be at least " + MIN_SECRET_BYTES + " bytes");
+        }
+        if (EXAMPLE_SECRET.equals(jwtSecret)) {
+            throw new IllegalStateException("app.security.jwt.secret is still the placeholder from "
+                    + "application.properties.example: anyone could forge tokens. Set your own secret "
+                    + "(same value as member-service).");
+        }
         SecretKeySpec key = new SecretKeySpec(jwtSecret.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
         return NimbusReactiveJwtDecoder.withSecretKey(key).macAlgorithm(MacAlgorithm.HS256).build();
     }

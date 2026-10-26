@@ -34,7 +34,7 @@ public class Member extends BaseEntity {
     @Column(nullable = false, unique = true, length = 150)
     private String email;
 
-    @Column(length = 20)
+    @Column(length = 20, unique = true)
     private String phone;
 
     @Enumerated(EnumType.STRING)

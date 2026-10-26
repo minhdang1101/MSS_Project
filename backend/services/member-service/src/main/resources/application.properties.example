@@ -21,3 +21,16 @@ eureka.instance.prefer-ip-address=true
 
 # ===== Actuator =====
 management.endpoints.web.exposure.include=health,info
+
+# ===== JWT (must match the api-gateway secret, >= 32 chars) =====
+app.security.jwt.secret=your_jwt_secret_at_least_32_characters
+app.security.jwt.expiration-minutes=480
+
+# ===== First librarian, created only when the librarian table is empty (leave password empty to skip) =====
+app.bootstrap.librarian.staff-code=TT-0001
+app.bootstrap.librarian.full-name=Thu thu mac dinh
+app.bootstrap.librarian.password=change_me_before_first_run
+
+# ===== Excel import =====
+spring.servlet.multipart.max-file-size=2MB
+spring.servlet.multipart.max-request-size=2MB
