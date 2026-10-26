@@ -1,0 +1,31 @@
+spring.application.name=api-gateway
+server.port=8080
+
+eureka.client.service-url.defaultZone=http://localhost:8761/eureka/
+
+# ===== JWT (HMAC-SHA256 shared secret) =====
+app.security.jwt.secret=your_jwt_secret_at_least_32_characters
+# Set to true once an auth/login flow issues tokens
+app.security.enabled=false
+
+# ===== CORS (React dev server) =====
+app.cors.allowed-origins=http://localhost:5173
+
+# ===== Routes: /api/<resource>/** -> lb://<service> =====
+spring.cloud.gateway.server.webflux.routes[0].id=books
+spring.cloud.gateway.server.webflux.routes[0].uri=lb://book-catalog-service
+spring.cloud.gateway.server.webflux.routes[0].predicates[0]=Path=/api/books/**,/api/copies/**
+spring.cloud.gateway.server.webflux.routes[1].id=members
+spring.cloud.gateway.server.webflux.routes[1].uri=lb://member-service
+spring.cloud.gateway.server.webflux.routes[1].predicates[0]=Path=/api/members/**
+spring.cloud.gateway.server.webflux.routes[2].id=loans
+spring.cloud.gateway.server.webflux.routes[2].uri=lb://loan-service
+spring.cloud.gateway.server.webflux.routes[2].predicates[0]=Path=/api/loans/**
+spring.cloud.gateway.server.webflux.routes[3].id=fines
+spring.cloud.gateway.server.webflux.routes[3].uri=lb://fine-service
+spring.cloud.gateway.server.webflux.routes[3].predicates[0]=Path=/api/fines/**,/api/fine-policies/**
+spring.cloud.gateway.server.webflux.routes[4].id=notifications
+spring.cloud.gateway.server.webflux.routes[4].uri=lb://notification-service
+spring.cloud.gateway.server.webflux.routes[4].predicates[0]=Path=/api/notifications/**
+
+management.endpoints.web.exposure.include=health,info,gateway

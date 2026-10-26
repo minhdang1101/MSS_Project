@@ -1,0 +1,35 @@
+spring.application.name=loan-service
+server.port=8083
+
+# ===== PostgreSQL (loan_db) =====
+spring.datasource.url=jdbc:postgresql://localhost:5432/loan_db
+spring.datasource.username=your_db_username
+spring.datasource.password=your_db_password
+spring.datasource.driver-class-name=org.postgresql.Driver
+
+# ===== JPA =====
+# 'update' is for early development only - switch to Flyway + 'validate' before release
+spring.jpa.hibernate.ddl-auto=update
+spring.jpa.open-in-view=false
+spring.jpa.show-sql=false
+spring.jpa.properties.hibernate.format_sql=true
+spring.jpa.properties.hibernate.jdbc.time_zone=UTC
+
+# ===== Eureka =====
+eureka.client.service-url.defaultZone=http://localhost:8761/eureka/
+eureka.instance.prefer-ip-address=true
+
+# ===== Actuator =====
+management.endpoints.web.exposure.include=health,info
+
+# ===== RabbitMQ =====
+spring.rabbitmq.host=localhost
+spring.rabbitmq.port=5672
+spring.rabbitmq.username=your_rabbitmq_username
+spring.rabbitmq.password=your_rabbitmq_password
+
+# ===== Loan rules =====
+app.loan.default-period-days=14
+app.loan.due-soon-days=2
+app.loan.due-scan-cron=0 0 8 * * *
+app.outbox.relay-interval-ms=5000
