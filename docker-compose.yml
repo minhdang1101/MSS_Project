@@ -1,4 +1,4 @@
-# Local infrastructure only (PostgreSQL + RabbitMQ). Services run from the IDE.
+# Local infrastructure (PostgreSQL, RabbitMQ, Eureka registry). Business services run from the IDE.
 # Credentials come from .env (git-ignored) - copy .env.example first.
 services:
   postgres:
@@ -22,6 +22,17 @@ services:
     ports:
       - "5672:5672"
       - "15672:15672"
+
+  # Service registry. Services started from the IDE register at http://localhost:8761/eureka/;
+  # services in containers use EUREKA_URL=http://eureka-server:8761/eureka/ and depends_on: eureka-server (healthy).
+  eureka-server:
+    build:
+      context: ./backend
+      dockerfile: infrastructure/eureka-server/Dockerfile
+    image: dlms/eureka-server
+    container_name: dlms-eureka
+    ports:
+      - "8761:8761"
 
 volumes:
   postgres-data:
