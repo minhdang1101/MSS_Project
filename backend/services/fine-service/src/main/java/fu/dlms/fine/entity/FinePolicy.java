@@ -13,6 +13,10 @@ import lombok.Setter;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
+/**
+ * A version of the fine rules. Versions are never edited: a change is a new version with a later effectiveFrom,
+ * so every fine keeps the rules it was opened with.
+ */
 @Getter
 @Setter
 @NoArgsConstructor
@@ -30,8 +34,13 @@ public class FinePolicy {
     @Column(name = "grace_days", nullable = false)
     private int graceDays;
 
+    /** Ceiling for one loan; null means no ceiling. */
     @Column(name = "max_amount", precision = 12, scale = 2)
     private BigDecimal maxAmount;
+
+    /** Charged on top of the cover price when a book is lost. */
+    @Column(name = "lost_book_fee", nullable = false, precision = 12, scale = 2)
+    private BigDecimal lostBookFee;
 
     @Column(nullable = false)
     private boolean active;

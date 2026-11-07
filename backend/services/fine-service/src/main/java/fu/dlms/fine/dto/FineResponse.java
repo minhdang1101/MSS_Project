@@ -10,6 +10,9 @@ public record FineResponse(
         Long id,
         Long loanId,
         Long memberId,
+        Long bookId,
+        Instant dueAt,
+        Instant returnedAt,
         int overdueDays,
         BigDecimal dailyRate,
         BigDecimal amount,
@@ -19,7 +22,13 @@ public record FineResponse(
 ) {
 
     public static FineResponse from(Fine fine) {
-        return new FineResponse(fine.getId(), fine.getLoanId(), fine.getMemberId(), fine.getOverdueDays(),
-                fine.getDailyRate(), fine.getAmount(), fine.getStatus(), fine.getCalculatedAt(), fine.getPaidAt());
+        return from(fine, fine.getOverdueDays(), fine.getAmount(), fine.getCalculatedAt());
+    }
+
+    /** For an ACCRUING fine, whose days and amount are worked out up to the moment of the request. */
+    public static FineResponse from(Fine fine, int overdueDays, BigDecimal amount, Instant calculatedAt) {
+        return new FineResponse(fine.getId(), fine.getLoanId(), fine.getMemberId(), fine.getBookId(),
+                fine.getDueAt(), fine.getReturnedAt(), overdueDays, fine.getDailyRate(), amount,
+                fine.getStatus(), calculatedAt, fine.getPaidAt());
     }
 }

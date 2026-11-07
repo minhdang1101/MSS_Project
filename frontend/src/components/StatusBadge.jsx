@@ -1,20 +1,26 @@
 const TONE = {
   ok: ['ACTIVE', 'AVAILABLE', 'PAID', 'SENT', 'RETURNED', 'BORROWED'],
-  late: ['OVERDUE', 'UNPAID', 'FAILED', 'SUSPENDED', 'LOCKED', 'LOST', 'DAMAGED'],
-  soon: ['PENDING', 'RESERVED', 'ON_LOAN'],
+  late: ['OVERDUE', 'ACCRUING', 'FAILED', 'SUSPENDED', 'LOCKED', 'LOST', 'DAMAGED'],
+  soon: ['PENDING', 'RESERVED', 'ON_LOAN', 'UNPAID'],
 }
 
 const LABEL = {
   ACTIVE: 'Hoạt động', SUSPENDED: 'Tạm khoá', LOCKED: 'Đã khoá',
   AVAILABLE: 'Sẵn có', UNAVAILABLE: 'Không sẵn có', ARCHIVED: 'Lưu trữ',
   BORROWED: 'Đang mượn', OVERDUE: 'Quá hạn', RETURNED: 'Đã trả',
-  UNPAID: 'Chưa thu', PAID: 'Đã thu', WAIVED: 'Miễn phạt',
+  ACCRUING: 'Đang tăng mỗi ngày', UNPAID: 'Chưa thu', PAID: 'Đã thu', WAIVED: 'Miễn phạt',
   PENDING: 'Chờ gửi', SENT: 'Đã gửi', FAILED: 'Gửi lỗi',
 }
 
 const toneOf = (status) => Object.keys(TONE).find((t) => TONE[t].includes(status)) ?? 'none'
 
-export default function StatusBadge({ status }) {
+/** With onClick the badge becomes a button that looks the same, for a status the librarian can act on. */
+export default function StatusBadge({ status, onClick, title }) {
   const key = String(status).toUpperCase()
-  return <span className={`st ${toneOf(key)}`}>{LABEL[key] ?? status}</span>
+  const className = `st ${toneOf(key)}`
+  const label = LABEL[key] ?? status
+  if (onClick) {
+    return <button type="button" className={className} onClick={onClick} title={title}>{label}</button>
+  }
+  return <span className={className}>{label}</span>
 }

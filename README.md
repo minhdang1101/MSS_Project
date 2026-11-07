@@ -53,15 +53,20 @@ cp .env.example .env
 
 1. **Hạ tầng** – dùng PostgreSQL cài sẵn (tạo 5 database bằng `docker/postgres/init-databases.sql`)
    hoặc Docker: `docker compose up -d` (RabbitMQ UI: http://localhost:15672).
+   Eureka cũng có trong compose: `docker compose up -d eureka-server` → dashboard http://localhost:8761.
 2. **Backend** (JDK 21): build `cd backend && mvn clean package -DskipTests`, rồi chạy theo thứ tự
-   `eureka-server` → các service → `api-gateway`.
+   `eureka-server` → các service → `api-gateway`. Service vẫn khởi động được khi Eureka chưa lên và tự
+   đăng ký lại sau. Địa chỉ registry đọc từ biến `EUREKA_URL` (mặc định `http://localhost:8761/eureka/`;
+   service chạy trong container dùng `http://eureka-server:8761/eureka/`).
 3. **Frontend**: `cd frontend && npm install && npm run dev` → http://localhost:5173
 
 ## Việc tiếp theo (TODO trong code)
 
 - Loan: luồng Borrow/Return, `OutboxRelay`, `DueDateScheduler`
 - Catalog: endpoint reserve availability, xử lý `loan.returned`
-- Fine: tính phạt khi nhận `loan.returned` / `loan.overdue` (`FineCalculator` đã có)
+- Fine: xong. `loan.overdue` mở khoản phạt "đang tăng mỗi ngày", `loan.returned` chốt số tiền.
+  Event lỗi sau 3 lần thử nằm ở queue `fine.loan-events.dlq`. Loan-service cần gửi thêm `loanType`
+  (PHYSICAL/DIGITAL) trong payload để sách điện tử không bị phạt.
 - Notification: lưu & gửi nhắc nhở
 - Auth: endpoint đăng nhập phát JWT, bật `app.security.enabled=true` ở gateway
 - Thay `ddl-auto=update` bằng Flyway migration trước khi release

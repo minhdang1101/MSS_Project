@@ -16,7 +16,7 @@ spring.jpa.properties.hibernate.format_sql=true
 spring.jpa.properties.hibernate.jdbc.time_zone=UTC
 
 # ===== Eureka =====
-eureka.client.service-url.defaultZone=http://localhost:8761/eureka/
+eureka.client.service-url.defaultZone=${EUREKA_URL:http://localhost:8761/eureka/}
 eureka.instance.prefer-ip-address=true
 
 # ===== Actuator =====
@@ -27,3 +27,16 @@ spring.rabbitmq.host=localhost
 spring.rabbitmq.port=5672
 spring.rabbitmq.username=your_rabbitmq_username
 spring.rabbitmq.password=your_rabbitmq_password
+# A loan event that still fails after 3 tries goes to the fine.loan-events.dlq queue instead of looping forever
+spring.rabbitmq.listener.simple.retry.enabled=true
+spring.rabbitmq.listener.simple.retry.max-attempts=3
+spring.rabbitmq.listener.simple.retry.initial-interval=2s
+spring.rabbitmq.listener.simple.retry.multiplier=2
+spring.rabbitmq.listener.simple.default-requeue-rejected=false
+
+# ===== First fine policy, created only when the fine_policy table is empty =====
+app.fine.default-policy.daily-rate=3000
+app.fine.default-policy.grace-days=1
+# leave empty for no ceiling
+app.fine.default-policy.max-amount=150000
+app.fine.default-policy.lost-book-fee=20000
