@@ -1,0 +1,9 @@
+# Build context for every service image is backend/.
+# Real config files hold passwords and must never end up inside an image.
+**/src/main/resources/application.properties
+**/src/main/resources/application-*.properties
+**/src/main/resources/application*.yml
+**/src/main/resources/application*.yaml
+**/target/
+**/*.iml
+**/.idea/

@@ -29,5 +29,8 @@ public class FineController {
         return fineService.pay(id);
     }
 
-    // TODO: /api/fine-policies CRUD for librarians
+    @PostMapping("/{id}/waive")
+    public FineResponse waive(@PathVariable Long id) {
+        return fineService.waive(id);
+    }
 }
