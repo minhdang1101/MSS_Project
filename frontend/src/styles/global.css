@@ -198,3 +198,11 @@ td:last-child .row-actions{white-space:nowrap}
 button.st{border:0;font-family:inherit;line-height:inherit;cursor:pointer}
 button.st:hover{box-shadow:inset 0 0 0 1px currentColor}
 @media (max-width:960px){.fines{grid-template-columns:1fr}}
+
+/* loans: the desk form beside the due slip of the book in hand */
+.desk .slip{min-height:100%}
+.book-line{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;padding:12px;border:1px solid var(--line);border-radius:6px;margin-bottom:14px;background:#F8FAF8}
+.book-line .right{text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:4px}
+tr.is-late td{background:var(--late-soft)}
+tr.is-late td:first-child{box-shadow:inset 3px 0 0 var(--late)}
+.list .right .btn{white-space:nowrap}

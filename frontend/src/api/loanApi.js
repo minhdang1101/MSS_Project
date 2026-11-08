@@ -1,10 +1,12 @@
 import axiosClient from './axiosClient.js'
 
 const loanApi = {
-  getAll: () => axiosClient.get('/loans'),
+  // params: { status?: 'BORROWED' | 'OVERDUE' | 'RETURNED', memberId? }
+  getAll: (params) => axiosClient.get('/loans', { params }),
   getById: (id) => axiosClient.get(`/loans/${id}`),
-  // idempotencyKey lets the backend ignore accidental double submits
-  borrow: (data) => axiosClient.post('/loans', { idempotencyKey: crypto.randomUUID(), ...data }),
+  // data: { idempotencyKey, memberId, bookId }. The caller keeps the same key when it retries the same borrow,
+  // so a double click or a retry after a timeout never creates a second loan.
+  borrow: (data) => axiosClient.post('/loans', data),
   returnBook: (id) => axiosClient.post(`/loans/${id}/return`),
 }
 

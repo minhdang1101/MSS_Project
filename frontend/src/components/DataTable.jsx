@@ -1,5 +1,5 @@
-/** columns: [{ key, label, num?, render?(row) }] */
-export default function DataTable({ columns, rows, emptyText = 'Chưa có dữ liệu.' }) {
+/** columns: [{ key, label, num?, render?(row) }]; rowClassName?(row) marks rows such as overdue loans. */
+export default function DataTable({ columns, rows, emptyText = 'Chưa có dữ liệu.', rowClassName }) {
   if (!rows?.length) return <p className="panel empty">{emptyText}</p>
 
   return (
@@ -14,7 +14,7 @@ export default function DataTable({ columns, rows, emptyText = 'Chưa có dữ l
         </thead>
         <tbody>
           {rows.map((row) => (
-            <tr key={row.id}>
+            <tr key={row.id} className={rowClassName?.(row)}>
               {columns.map((c) => (
                 <td key={c.key} className={c.num ? 'num' : undefined}>{c.render ? c.render(row) : row[c.key]}</td>
               ))}

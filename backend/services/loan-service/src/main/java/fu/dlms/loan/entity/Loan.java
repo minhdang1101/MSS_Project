@@ -57,6 +57,10 @@ public class Loan extends BaseEntity {
     @Column(nullable = false, length = 20)
     private LoanStatus status = LoanStatus.BORROWED;
 
+    /** Set when LoanDueSoon was emitted, so the daily scan sends the reminder only once per loan. */
+    @Column(name = "due_soon_notified_at")
+    private Instant dueSoonNotifiedAt;
+
     /** Optimistic lock: prevents the same loan being returned twice concurrently. */
     @Version
     private Long version;
