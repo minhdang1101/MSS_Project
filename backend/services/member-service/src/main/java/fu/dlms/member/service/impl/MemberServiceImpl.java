@@ -1,6 +1,7 @@
 package fu.dlms.member.service.impl;
 
 import fu.dlms.member.dto.MemberImportResult;
+import fu.dlms.member.dto.MemberImportResult.IssuedCredential;
 import fu.dlms.member.dto.MemberImportResult.RowError;
 import fu.dlms.member.dto.MemberImportRow;
 import fu.dlms.member.dto.MemberRequest;
@@ -10,10 +11,12 @@ import fu.dlms.member.entity.MemberStatus;
 import fu.dlms.member.exception.DuplicateValueException;
 import fu.dlms.member.exception.ResourceNotFoundException;
 import fu.dlms.member.repository.MemberRepository;
+import fu.dlms.member.security.PasswordGenerator;
 import fu.dlms.member.service.MemberService;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validator;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,6 +28,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 @Service
 @RequiredArgsConstructor
@@ -38,6 +42,8 @@ public class MemberServiceImpl implements MemberService {
     private final MemberRepository memberRepository;
     private final MemberExcelParser excelParser;
     private final CardNumberGenerator cardNumberGenerator;
+    private final PasswordEncoder passwordEncoder;
+    private final PasswordGenerator passwordGenerator;
     private final Validator validator;
 
     @Override
@@ -62,7 +68,10 @@ public class MemberServiceImpl implements MemberService {
             throw DuplicateValueException.phone();
         }
         String cardNo = cardNumberGenerator.next(1).get(0);
-        return MemberResponse.from(memberRepository.save(newMember(cardNo, request)));
+        Member member = newMember(cardNo, request);
+        String password = passwordGenerator.generate();
+        member.setPasswordHash(passwordEncoder.encode(password));
+        return MemberResponse.from(memberRepository.save(member)).withInitialPassword(password);
     }
 
     @Override
@@ -111,17 +120,38 @@ public class MemberServiceImpl implements MemberService {
         }
 
         if (accepted.isEmpty()) {
-            return new MemberImportResult(0, errors);
+            return new MemberImportResult(0, errors, List.of());
         }
 
         // Card numbers are issued only for rows that will really be saved, so no number is wasted on a bad row.
         List<String> cardNumbers = cardNumberGenerator.next(accepted.size());
-        List<Member> toSave = new ArrayList<>();
+        List<String> passwords = new ArrayList<>();
         for (int i = 0; i < accepted.size(); i++) {
-            toSave.add(newMember(cardNumbers.get(i), accepted.get(i)));
+            passwords.add(passwordGenerator.generate());
+        }
+        // BCrypt is deliberately slow (about 0.1 s each), so hash the whole batch on all cores at once.
+        List<String> hashes = IntStream.range(0, accepted.size()).parallel()
+                .mapToObj(i -> passwordEncoder.encode(passwords.get(i))).toList();
+
+        List<Member> toSave = new ArrayList<>();
+        List<IssuedCredential> credentials = new ArrayList<>();
+        for (int i = 0; i < accepted.size(); i++) {
+            Member member = newMember(cardNumbers.get(i), accepted.get(i));
+            member.setPasswordHash(hashes.get(i));
+            toSave.add(member);
+            credentials.add(new IssuedCredential(member.getLibraryCardNo(), member.getFullName(), passwords.get(i)));
         }
         memberRepository.saveAll(toSave);
-        return new MemberImportResult(toSave.size(), errors);
+        return new MemberImportResult(toSave.size(), errors, credentials);
+    }
+
+    @Override
+    @Transactional
+    public MemberResponse resetPassword(Long id) {
+        Member member = memberRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException(MEMBER, id));
+        String password = passwordGenerator.generate();
+        member.setPasswordHash(passwordEncoder.encode(password));
+        return MemberResponse.from(memberRepository.save(member)).withInitialPassword(password);
     }
 
     /** Returns a human-readable reason this row cannot be imported, or null when it can. */

@@ -1,6 +1,7 @@
 package fu.dlms.catalog.messaging;
 
 import fu.dlms.catalog.config.RabbitMqConfig;
+import fu.dlms.catalog.service.ReservationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.core.Binding;
@@ -28,10 +29,11 @@ public class LoanEventListener {
         return BindingBuilder.bind(catalogLoanReturnedQueue).to(libraryExchange).with(RabbitMqConfig.LOAN_RETURNED);
     }
 
+    private final ReservationService reservationService;
+
     @RabbitListener(queues = QUEUE)
     public void onLoanReturned(LoanEvent event) {
         log.info("Received {} for loan {}", event.eventType(), event.loanId());
-        // TODO: skip if processed_event exists, else mark copy AVAILABLE, increase available_copies,
-        //       then save processed_event - all in one transaction
+        reservationService.onLoanReturned(event);
     }
 }

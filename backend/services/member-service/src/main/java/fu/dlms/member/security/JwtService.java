@@ -2,6 +2,7 @@ package fu.dlms.member.security;
 
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
 import fu.dlms.member.entity.Librarian;
+import fu.dlms.member.entity.Member;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.JwsHeader;
 import org.springframework.security.oauth2.jwt.JwtClaimsSet;
@@ -43,18 +44,33 @@ public class JwtService {
         this.clock = clock;
     }
 
+    /** A staff token: role LIBRARIAN, no member id. */
     public IssuedToken issue(Librarian librarian) {
+        return issue(librarian.getStaffCode(), librarian.getFullName(), "LIBRARIAN", null);
+    }
+
+    /**
+     * A reader token: role MEMBER, subject = card number. The member id ("mid") is what the gateway forwards to the
+     * services so a reader can only ever be answered with their own data.
+     */
+    public IssuedToken issue(Member member) {
+        return issue(member.getLibraryCardNo(), member.getFullName(), "MEMBER", member.getId());
+    }
+
+    private IssuedToken issue(String subject, String name, String role, Long memberId) {
         Instant now = clock.instant();
         Instant expiresAt = now.plus(lifetime);
-        JwtClaimsSet claims = JwtClaimsSet.builder()
-                .subject(librarian.getStaffCode())
-                .claim("name", librarian.getFullName())
-                .claim("role", "LIBRARIAN")
+        JwtClaimsSet.Builder claims = JwtClaimsSet.builder()
+                .subject(subject)
+                .claim("name", name)
+                .claim("role", role)
                 .issuedAt(now)
-                .expiresAt(expiresAt)
-                .build();
+                .expiresAt(expiresAt);
+        if (memberId != null) {
+            claims.claim("mid", memberId);
+        }
         JwsHeader header = JwsHeader.with(MacAlgorithm.HS256).build();
-        String token = encoder.encode(JwtEncoderParameters.from(header, claims)).getTokenValue();
+        String token = encoder.encode(JwtEncoderParameters.from(header, claims.build())).getTokenValue();
         return new IssuedToken(token, expiresAt);
     }
 }

@@ -68,6 +68,15 @@ public class MemberController {
         return memberService.changeStatus(id, request.status());
     }
 
+    /**
+     * Gives the member a new random login password (the old one stops working). The answer carries it once
+     * ({@code initialPassword}); only its hash is stored, so it cannot be shown again.
+     */
+    @PostMapping("/{id}/password-reset")
+    public MemberResponse resetPassword(@PathVariable Long id) {
+        return memberService.resetPassword(id);
+    }
+
     /** The blank Excel file librarians fill in, then upload to {@code POST /import}. */
     @GetMapping("/import/template")
     public ResponseEntity<byte[]> importTemplate() {

@@ -43,4 +43,11 @@ public class Member extends BaseEntity {
 
     @Column(name = "joined_at", nullable = false)
     private LocalDate joinedAt;
+
+    /**
+     * BCrypt hash of the reader's login password. Null until a librarian issues one, and a member without a hash
+     * cannot log in. Nullable on purpose: ddl-auto cannot add a required column to rows that already exist.
+     */
+    @Column(name = "password_hash", length = 100)
+    private String passwordHash;
 }

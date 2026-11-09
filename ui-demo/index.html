@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quản lý thư viện</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Alegreya:wght@400;500;700&family=Alegreya+Sans:wght@400;500;700&family=Courier+Prime:wght@700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<section class="login" id="login" aria-labelledby="login-title">
+  <form class="card" id="login-form" novalidate>
+    <div class="card-head">
+      <div class="brand-dark">Quản lý thư viện</div>
+      <span class="hole" aria-hidden="true"></span>
+    </div>
+    <h1 id="login-title">Đăng nhập quầy thủ thư</h1>
+    <p class="sub">Dùng mã thủ thư được cấp khi nhận ca.</p>
+    <div class="field"><label for="l-id">Mã thủ thư</label>
+      <input id="l-id" autocomplete="username" placeholder="Ví dụ: TT-0021"></div>
+    <div class="field"><label for="l-pw">Mật khẩu</label>
+      <input id="l-pw" type="password" autocomplete="current-password"></div>
+    <label class="check"><input type="checkbox" id="l-keep"> Ghi nhớ trên máy này</label>
+    <p class="err" id="l-err" role="alert" hidden>Nhập mã thủ thư và mật khẩu để đăng nhập.</p>
+    <button class="btn primary wide" type="submit">Đăng nhập</button>
+    <p class="note">Quên mật khẩu? Liên hệ quản trị viên thư viện để cấp lại.</p>
+  </form>
+</section>
+<div class="app" id="app" hidden>
+  <aside class="rail">
+    <div class="brand">Quản lý thư viện<small>Quầy thủ thư</small></div>
+    <nav class="nav" aria-label="Điều hướng chính">
+      <button data-v="today" aria-current="page">Hôm nay <span class="count" id="nav-late"></span></button>
+      <button data-v="desk">Mượn và trả</button>
+      <button data-v="catalog">Danh mục sách</button>
+      <button data-v="members">Thành viên</button>
+      <button data-v="fines">Tiền phạt</button>
+      <button data-v="notify">Nhắc hạn</button>
+    </nav>
+    <div class="who"><b id="who-name">Nguyễn Thu Trang</b>Thủ thư, ca sáng<button class="logout" id="logout" type="button">Đăng xuất</button></div>
+  </aside>
+
+  <main>
+    <!-- HÔM NAY -->
+    <section class="view on" id="today">
+      <div class="head">
+        <div><h1>Thứ Hai, 26 tháng 10</h1><p class="sub">Những việc cần xử lý ở quầy hôm nay.</p></div>
+        <button class="btn primary" data-go="desk">Mở quầy mượn trả</button>
+      </div>
+      <div class="strip" id="strip"></div>
+      <div class="grid2">
+        <div class="panel">
+          <h2>Quá hạn, đang tính phạt</h2>
+          <ul class="list" id="today-late"></ul>
+        </div>
+        <div class="panel">
+          <h2>Đến hạn trong 3 ngày tới</h2>
+          <ul class="list" id="today-soon"></ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- QUẦY MƯỢN TRẢ -->
+    <section class="view" id="desk">
+      <div class="head"><div><h1>Mượn và trả</h1><p class="sub">Quét thẻ thành viên và mã ISBN để ghi phiếu.</p></div></div>
+      <div class="seg" role="group" aria-label="Chế độ">
+        <button aria-pressed="false" data-mode="borrow">Cho mượn</button>
+        <button aria-pressed="true" data-mode="return">Nhận trả</button>
+      </div>
+      <div class="grid2">
+        <div class="panel">
+          <div id="form-return">
+            <div class="field"><label for="r-loan">Sách đang được mượn</label>
+              <select id="r-loan"></select></div>
+            <div class="field"><label for="r-date">Ngày trả</label>
+              <input type="date" id="r-date" value="2026-10-26"></div>
+            <div class="member-chip" id="r-member"></div>
+            <div class="calc" id="r-calc"></div>
+            <div style="display:flex;gap:10px;margin-top:18px;flex-wrap:wrap">
+              <button class="btn stamp" id="r-do">Nhận trả sách</button>
+              <button class="btn" id="r-pay" disabled>Thu tiền phạt</button>
+            </div>
+          </div>
+          <div id="form-borrow" hidden>
+            <div class="field"><label for="b-member">Thẻ thành viên</label>
+              <select id="b-member"></select></div>
+            <div class="member-chip" id="b-chip"></div>
+            <div class="field"><label for="b-book">Sách (ISBN)</label>
+              <select id="b-book"></select></div>
+            <div class="field"><label for="b-days">Thời hạn mượn</label>
+              <select id="b-days"><option value="14">14 ngày</option><option value="21">21 ngày</option><option value="7">7 ngày (sách tham khảo)</option></select></div>
+            <p class="note" id="b-rule"></p>
+            <div style="margin-top:18px"><button class="btn stamp" id="b-do">Cho mượn và đóng dấu hạn trả</button></div>
+          </div>
+        </div>
+
+        <div>
+          <div class="slip" id="slip" aria-live="polite">
+            <div class="slip-head"><div class="t">Phiếu hạn trả</div><div class="s">Vui lòng trả sách đúng hoặc trước ngày đóng dấu cuối cùng</div></div>
+            <div class="slip-book"><span id="slip-title"></span><span id="slip-copy"></span></div>
+            <div class="slip-rows">
+              <div class="col"><div class="lbl">Ngày mượn</div><div id="slip-out"></div></div>
+              <div class="col"><div class="lbl">Hạn trả</div><div id="slip-due"></div></div>
+            </div>
+            <div class="bigstamp" id="bigstamp"></div>
+          </div>
+          <p class="note">Sách điện tử tự thu hồi quyền đọc khi hết hạn nên không phát sinh phạt.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- DANH MỤC -->
+    <section class="view" id="catalog">
+      <div class="head"><div><h1>Danh mục sách</h1><p class="sub">Bản in trên kệ và giấy phép sách điện tử.</p></div><button class="btn primary">Thêm đầu sách</button></div>
+      <div class="toolbar">
+        <input id="q" type="search" placeholder="Tìm theo tên sách, tác giả hoặc ISBN" aria-label="Tìm sách">
+        <select id="fmt" class="btn" aria-label="Định dạng"><option value="">Tất cả định dạng</option><option value="print">Bản in</option><option value="digital">Điện tử</option></select>
+      </div>
+      <div class="panel tablewrap" style="padding:6px 8px">
+        <table><thead><tr><th>Sách</th><th>ISBN</th><th>Định dạng</th><th class="num">Còn sẵn</th><th>Tình trạng</th></tr></thead><tbody id="cat-body"></tbody></table>
+      </div>
+    </section>
+
+    <!-- THÀNH VIÊN -->
+    <section class="view" id="members">
+      <div class="head"><div><h1>Thành viên</h1><p class="sub">Thẻ còn nợ phạt từ 50.000đ trở lên sẽ bị tạm khoá mượn.</p></div><button class="btn primary">Cấp thẻ mới</button></div>
+      <div class="panel tablewrap" style="padding:6px 8px">
+        <table><thead><tr><th>Thành viên</th><th>Hạng thẻ</th><th class="num">Đang mượn</th><th class="num">Nợ phạt</th><th>Trạng thái</th></tr></thead><tbody id="mem-body"></tbody></table>
+      </div>
+    </section>
+
+    <!-- TIỀN PHẠT -->
+    <section class="view" id="fines">
+      <div class="head"><div><h1>Tiền phạt</h1><p class="sub">Tính theo ngày cho sách in trả muộn.</p></div></div>
+      <div class="grid2">
+        <div class="panel tablewrap" style="padding:6px 8px">
+          <table><thead><tr><th>Thành viên và sách</th><th class="num">Trễ</th><th class="num">Số tiền</th><th>Trạng thái</th></tr></thead><tbody id="fine-body"></tbody></table>
+        </div>
+        <div class="panel">
+          <h2>Cách tính phạt</h2>
+          <div class="calc" style="margin-top:0;border-top:0;padding-top:0">
+            <div class="row"><span>Mức phạt mỗi ngày</span><span>3.000đ</span></div>
+            <div class="row"><span>Ngày ân hạn</span><span>1 ngày</span></div>
+            <div class="row"><span>Mức trần mỗi lượt mượn</span><span>150.000đ</span></div>
+            <div class="row"><span>Sách điện tử</span><span>Không phạt</span></div>
+            <div class="row"><span>Mất sách</span><span>Giá bìa + 20.000đ</span></div>
+          </div>
+          <p class="note">Ngày trễ được đếm từ hạn trả đến ngày nhận lại sách. Ngày thư viện đóng cửa không bị tính.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- NHẮC HẠN -->
+    <section class="view" id="notify">
+      <div class="head"><div><h1>Nhắc hạn</h1><p class="sub">Lịch gửi tin nhắn và email cho từng lượt mượn.</p></div></div>
+      <div class="grid2">
+        <div class="panel">
+          <h2>Lịch nhắc mặc định</h2>
+          <ol class="tl">
+            <li class="sent"><b>3 ngày trước hạn</b><div class="meta">Email kèm nút gia hạn trực tuyến</div></li>
+            <li class="sent"><b>1 ngày trước hạn</b><div class="meta">Tin nhắn SMS</div></li>
+            <li class="late"><b>Ngày đầu quá hạn</b><div class="meta">Email báo mức phạt đang được tính</div></li>
+            <li><b>7 ngày quá hạn</b><div class="meta">Thủ thư gọi điện, thẻ bị tạm khoá mượn</div></li>
+          </ol>
+        </div>
+        <div class="panel">
+          <h2>Sẽ gửi trong hôm nay</h2>
+          <ul class="list" id="queue"></ul>
+          <button class="btn primary" style="margin-top:14px" id="send">Gửi ngay 0 lời nhắc</button>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script src="app.js"></script>
+</body>
+</html>

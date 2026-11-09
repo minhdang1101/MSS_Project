@@ -9,6 +9,7 @@ import fu.dlms.member.entity.MemberStatus;
 import fu.dlms.member.exception.DuplicateValueException;
 import fu.dlms.member.exception.ResourceNotFoundException;
 import fu.dlms.member.repository.MemberRepository;
+import fu.dlms.member.security.PasswordGenerator;
 import fu.dlms.member.service.impl.CardNumberGenerator;
 import fu.dlms.member.service.impl.MemberExcelParser;
 import fu.dlms.member.service.impl.MemberServiceImpl;
@@ -16,6 +17,8 @@ import jakarta.validation.Validation;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.io.ByteArrayInputStream;
 import java.time.LocalDate;
@@ -37,11 +40,14 @@ class MemberServiceImplTest {
     private final MemberRepository repository = mock(MemberRepository.class);
     private final MemberExcelParser parser = mock(MemberExcelParser.class);
     private final CardNumberGenerator cardNumbers = mock(CardNumberGenerator.class);
+    private final PasswordEncoder encoder = new BCryptPasswordEncoder(4);
+    private final PasswordGenerator passwords = mock(PasswordGenerator.class);
     private MemberServiceImpl service;
 
     @BeforeEach
     void setUp() {
-        service = new MemberServiceImpl(repository, parser, cardNumbers,
+        when(passwords.generate()).thenReturn("Abcd2345Wxyz", "Efgh6789Wxyz", "Jklm2345Wxyz");
+        service = new MemberServiceImpl(repository, parser, cardNumbers, encoder, passwords,
                 Validation.buildDefaultValidatorFactory().getValidator());
         when(repository.save(any(Member.class))).thenAnswer(inv -> inv.getArgument(0));
     }
@@ -91,6 +97,75 @@ class MemberServiceImplTest {
                     assertThat(e.getMessage()).isEqualTo("Số điện thoại này đã được dùng cho thành viên khác");
                 });
         verify(cardNumbers, never()).next(anyInt());
+    }
+
+    // ---------- passwords ----------
+
+    @Test
+    void createGivesTheNewMemberAFreshPasswordStoredOnlyAsABcryptHashAndShownOnce() {
+        when(cardNumbers.next(1)).thenReturn(List.of("TV-0413"));
+        ArgumentCaptor<Member> saved = ArgumentCaptor.forClass(Member.class);
+
+        MemberResponse response = service.create(new MemberRequest("Nguyễn A", "a@example.com", "0900000001"));
+
+        verify(repository).save(saved.capture());
+        assertThat(response.initialPassword()).isEqualTo("Abcd2345Wxyz");
+        assertThat(saved.getValue().getPasswordHash()).isNotEqualTo("Abcd2345Wxyz").startsWith("$2");
+        assertThat(encoder.matches("Abcd2345Wxyz", saved.getValue().getPasswordHash())).isTrue();
+    }
+
+    @Test
+    void listingAndLookingUpMembersNeverRevealsAPasswordOrItsHash() {
+        Member existing = member(1, "TV-1", "one@example.com");
+        existing.setPasswordHash(encoder.encode("secret-value"));
+        when(repository.findById(1L)).thenReturn(Optional.of(existing));
+        when(repository.findAll()).thenReturn(List.of(existing));
+
+        assertThat(service.findById(1L).initialPassword()).isNull();
+        assertThat(service.findAll()).allSatisfy(r -> assertThat(r.initialPassword()).isNull());
+        assertThat(MemberResponse.class.getRecordComponents()).extracting(c -> c.getName()).doesNotContain("passwordHash");
+    }
+
+    @Test
+    void resettingAPasswordStoresANewHashAndReturnsTheNewPasswordOnce() {
+        Member existing = member(1, "TV-1", "one@example.com");
+        existing.setPasswordHash(encoder.encode("old-password-1"));
+        when(repository.findById(1L)).thenReturn(Optional.of(existing));
+
+        MemberResponse response = service.resetPassword(1L);
+
+        assertThat(response.initialPassword()).isEqualTo("Abcd2345Wxyz");
+        assertThat(encoder.matches("Abcd2345Wxyz", existing.getPasswordHash())).isTrue();
+        assertThat(encoder.matches("old-password-1", existing.getPasswordHash())).isFalse();
+        assertThat(response.libraryCardNo()).isEqualTo("TV-1");
+    }
+
+    @Test
+    void resettingThePasswordOfAnUnknownMemberIsNotFound() {
+        when(repository.findById(9L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.resetPassword(9L)).isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void importGivesEveryImportedMemberItsOwnPasswordAndListsThemOnceForThePrintout() {
+        when(parser.parse(any())).thenReturn(List.of(
+                new MemberImportRow(2, "Một", "one@example.com", "0900000001"),
+                new MemberImportRow(3, "Email hỏng", "bad", "0900000002"),
+                new MemberImportRow(4, "Hai", "two@example.com", "0900000003")));
+        when(cardNumbers.next(2)).thenReturn(List.of("TV-0413", "TV-0414"));
+
+        MemberImportResult result = service.importFromExcel(new ByteArrayInputStream(new byte[0]));
+
+        assertThat(result.credentials()).extracting(MemberImportResult.IssuedCredential::libraryCardNo, MemberImportResult.IssuedCredential::fullName, MemberImportResult.IssuedCredential::initialPassword)
+                .containsExactly(
+                        org.assertj.core.groups.Tuple.tuple("TV-0413", "Một", "Abcd2345Wxyz"),
+                        org.assertj.core.groups.Tuple.tuple("TV-0414", "Hai", "Efgh6789Wxyz"));
+        ArgumentCaptor<List<Member>> saved = ArgumentCaptor.forClass(List.class);
+        verify(repository).saveAll(saved.capture());
+        assertThat(saved.getValue()).allSatisfy(m -> assertThat(m.getPasswordHash()).startsWith("$2"));
+        assertThat(encoder.matches("Efgh6789Wxyz", saved.getValue().get(1).getPasswordHash())).isTrue();
     }
 
     // ---------- update ----------

@@ -6,7 +6,7 @@ import { useEffect, useRef } from 'react'
  * "close" event that tells the parent to unmount the dialog right after it opened. Unmounting removes
  * the element (and its backdrop) on its own.
  */
-export default function Modal({ title, onClose, children }) {
+export default function Modal({ title, onClose, wide = false, children }) {
   const ref = useRef(null)
 
   useEffect(() => {
@@ -15,7 +15,7 @@ export default function Modal({ title, onClose, children }) {
   }, [])
 
   return (
-    <dialog ref={ref} className="modal" aria-labelledby="modal-title" onClose={onClose}>
+    <dialog ref={ref} className={wide ? 'modal modal-wide' : 'modal'} aria-labelledby="modal-title" onClose={onClose}>
       <h2 id="modal-title">{title}</h2>
       {children}
     </dialog>

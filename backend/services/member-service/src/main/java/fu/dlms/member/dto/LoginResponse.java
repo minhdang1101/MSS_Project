@@ -2,9 +2,11 @@ package fu.dlms.member.dto;
 
 import java.time.Instant;
 
-public record LoginResponse(String token, String tokenType, Instant expiresAt, String staffCode, String fullName) {
+/** {@code role} is LIBRARIAN or MEMBER and decides which screens the web app shows. */
+public record LoginResponse(String token, String tokenType, Instant expiresAt, String role, String username,
+                            String fullName) {
 
-    public static LoginResponse bearer(String token, Instant expiresAt, String staffCode, String fullName) {
-        return new LoginResponse(token, "Bearer", expiresAt, staffCode, fullName);
+    public static LoginResponse bearer(String token, Instant expiresAt, String role, String username, String fullName) {
+        return new LoginResponse(token, "Bearer", expiresAt, role, username, fullName);
     }
 }

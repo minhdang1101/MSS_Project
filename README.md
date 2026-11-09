@@ -26,7 +26,7 @@ digital-library/
 │       └── notification-service :8085  # notification_db - notification
 ├── frontend/                    :5173
 │   └── src/ api/ components/ config/ context/ hooks/ layouts/ pages/ routes/ styles/ utils/
-├── docker/postgres/init-databases.sql
+├── docker/postgres/             # 00-create-databases, 01-schema, 02-seed (chạy theo thứ tự)
 └── docker-compose.yml           # PostgreSQL + RabbitMQ cho môi trường dev
 ```
 
@@ -51,9 +51,24 @@ cp .env.example .env
 
 ## Chạy local
 
+<<<<<<< Updated upstream
 1. **Hạ tầng** – dùng PostgreSQL cài sẵn (tạo 5 database bằng `docker/postgres/init-databases.sql`)
    hoặc Docker: `docker compose up -d` (RabbitMQ UI: http://localhost:15672).
    Eureka cũng có trong compose: `docker compose up -d eureka-server` → dashboard http://localhost:8761.
+=======
+1. **Hạ tầng** – Docker: `docker compose up -d` (RabbitMQ UI: http://localhost:15672).
+   Lần đầu khởi tạo volume, PostgreSQL tự chạy các script trong `docker/postgres/` theo thứ tự:
+   `00-create-databases.sql` (5 database) → `01-schema.sql` (bảng, khớp entity JPA) → `02-seed.sql` (dữ liệu mẫu).
+   Script chỉ chạy khi volume trống; muốn tạo lại từ đầu (xoá hết dữ liệu): `docker compose down -v && docker compose up -d`.
+
+   Không dùng Docker: chạy 3 file trên bằng `psql` trên PostgreSQL cài sẵn, đúng thứ tự:
+   ```bash
+   psql -U postgres -f docker/postgres/00-create-databases.sql
+   psql -U postgres -f docker/postgres/01-schema.sql
+   psql -U postgres -f docker/postgres/02-seed.sql
+   ```
+   Cả 3 file chạy lại được nhiều lần mà không lỗi và không nhân đôi dữ liệu.
+>>>>>>> Stashed changes
 2. **Backend** (JDK 21): build `cd backend && mvn clean package -DskipTests`, rồi chạy theo thứ tự
    `eureka-server` → các service → `api-gateway`. Service vẫn khởi động được khi Eureka chưa lên và tự
    đăng ký lại sau. Địa chỉ registry đọc từ biến `EUREKA_URL` (mặc định `http://localhost:8761/eureka/`;

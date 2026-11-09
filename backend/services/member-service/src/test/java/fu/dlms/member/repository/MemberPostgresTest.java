@@ -3,6 +3,7 @@ package fu.dlms.member.repository;
 import fu.dlms.member.dto.MemberRequest;
 import fu.dlms.member.dto.MemberResponse;
 import fu.dlms.member.entity.Member;
+import fu.dlms.member.security.PasswordGenerator;
 import fu.dlms.member.service.impl.CardNumberGenerator;
 import fu.dlms.member.service.impl.MemberExcelParser;
 import fu.dlms.member.service.impl.MemberServiceImpl;
@@ -13,7 +14,11 @@ import org.springframework.boot.autoconfigure.validation.ValidationAutoConfigura
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.transaction.IllegalTransactionStateException;
 import org.springframework.transaction.annotation.Propagation;
@@ -42,9 +47,19 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @Testcontainers(disabledWithoutDocker = true)
 @DataJpaTest(properties = "spring.jpa.hibernate.ddl-auto=create")
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import({MemberServiceImpl.class, CardNumberGenerator.class, MemberExcelParser.class, ValidationAutoConfiguration.class})
+@Import({MemberServiceImpl.class, CardNumberGenerator.class, MemberExcelParser.class, ValidationAutoConfiguration.class,
+        PasswordGenerator.class, MemberPostgresTest.FastEncoder.class})
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class MemberPostgresTest {
+
+    /** Cheap BCrypt so the many concurrent creates do not spend their time hashing. */
+    @TestConfiguration
+    static class FastEncoder {
+        @Bean
+        PasswordEncoder passwordEncoder() {
+            return new BCryptPasswordEncoder(4);
+        }
+    }
 
     @Container
     @ServiceConnection

@@ -4,7 +4,11 @@ import fu.dlms.member.entity.Member;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
+import java.util.Optional;
+
 public interface MemberRepository extends JpaRepository<Member, Long> {
+
+    Optional<Member> findByLibraryCardNo(String libraryCardNo);
 
     boolean existsByEmailIgnoreCase(String email);
 

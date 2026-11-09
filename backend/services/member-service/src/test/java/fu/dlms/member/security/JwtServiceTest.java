@@ -21,7 +21,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class JwtServiceTest {
 
     private static final String SECRET = "unit_test_secret_that_is_at_least_32_chars";
-    private static final Instant NOW = Instant.parse("2026-10-26T08:00:00Z");
+    /** The decoder checks expiry against the real clock, so the fixed test clock must start at the real "now". */
+    private static final Instant NOW = Instant.now().truncatedTo(java.time.temporal.ChronoUnit.SECONDS);
 
     private final Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
 
@@ -50,6 +51,32 @@ class JwtServiceTest {
         assertThat(jwt.getClaimAsString("role")).isEqualTo("LIBRARIAN");
         assertThat(jwt.getIssuedAt()).isEqualTo(NOW);
         assertThat(jwt.getExpiresAt()).isEqualTo(NOW.plus(Duration.ofMinutes(480)));
+    }
+
+    @Test
+    void aReaderTokenCarriesTheMemberRoleAndTheMemberIdThatTheGatewayForwards() {
+        fu.dlms.member.entity.Member member = new fu.dlms.member.entity.Member();
+        member.setId(42L);
+        member.setLibraryCardNo("TV-0412");
+        member.setFullName("Phạm Minh Khôi");
+        JwtService service = new JwtService(new JwtProperties(SECRET, 480), clock);
+
+        Jwt jwt = decoder(SECRET).decode(service.issue(member).token());
+
+        assertThat(jwt.getSubject()).isEqualTo("TV-0412");
+        assertThat(jwt.getClaimAsString("role")).isEqualTo("MEMBER");
+        assertThat(jwt.<Long>getClaim("mid")).isEqualTo(42L);
+        assertThat(jwt.getClaimAsString("name")).isEqualTo("Phạm Minh Khôi");
+        assertThat(jwt.getExpiresAt()).isEqualTo(NOW.plus(Duration.ofMinutes(480)));
+    }
+
+    @Test
+    void aLibrarianTokenHasNoMemberId() {
+        JwtService service = new JwtService(new JwtProperties(SECRET, 480), clock);
+
+        Jwt jwt = decoder(SECRET).decode(service.issue(librarian()).token());
+
+        assertThat(jwt.hasClaim("mid")).isFalse();
     }
 
     @Test
