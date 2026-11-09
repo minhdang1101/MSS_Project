@@ -2,6 +2,7 @@ package fu.dlms.catalog.controller;
 
 import fu.dlms.catalog.dto.BookRequest;
 import fu.dlms.catalog.dto.BookResponse;
+import fu.dlms.catalog.entity.BookFormat;
 import fu.dlms.catalog.service.BookService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -18,15 +19,12 @@ public class BookController {
 
     private final BookService bookService;
 
-    @GetMapping
-    public List<BookResponse> findAll() {
-        return bookService.findAll();
+    @GetMapping()
+    public ResponseEntity<List<BookResponse>> search(@RequestParam(required = false) String q,
+                                                     @RequestParam(required = false) BookFormat format) {
+        return ResponseEntity.status(HttpStatus.OK).body(bookService.search(q, format));
     }
 
-    @GetMapping("/search")
-    public ResponseEntity<List<BookResponse>> search(@RequestParam(required = false) String keyword) {
-        return ResponseEntity.status(HttpStatus.OK).body(bookService.search(keyword));
-    }
 
 
     @GetMapping("/{id}")

@@ -1,6 +1,7 @@
 package fu.dlms.catalog.repository;
 
 import fu.dlms.catalog.entity.Book;
+import fu.dlms.catalog.entity.BookFormat;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -15,8 +16,10 @@ public interface BookRepository extends JpaRepository<Book, Long> {
     boolean existsByIsbn(String isbn);
 
     @Query("select b from Book b where b.status <> fu.dlms.catalog.entity.BookStatus.ARCHIVED "
-            + "and (lower(b.title) like :keyword or lower(b.author) like :keyword or b.isbn like :keyword)")
-    List<Book> search(@Param("keyword") String keyword);
+            + "and (lower(b.title) like :q or lower(b.author) like :q or b.isbn like :q) "
+            + "and (:format is null or b.format = :format)")
+
+    List<Book> search(@Param("q") String q, @Param("format") BookFormat format);
 
 
 }

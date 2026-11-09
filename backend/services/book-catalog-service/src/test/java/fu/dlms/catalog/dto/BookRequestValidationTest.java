@@ -12,7 +12,7 @@ class BookRequestValidationTest {
     private final Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
 
     private BookRequest request(String isbn, Integer year) {
-        return new BookRequest(isbn, "Tên", "Tác giả", null, year, BookFormat.PHYSICAL, 1, null);
+        return new BookRequest(isbn, "Tên", "Tác giả", null, year, BookFormat.PHYSICAL, 1);
     }
 
     @Test
