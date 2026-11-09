@@ -16,6 +16,13 @@ INSERT INTO member (id, library_card_no, full_name, email, phone, status, joined
 ON CONFLICT DO NOTHING;
 SELECT setval(pg_get_serial_sequence('member', 'id'), (SELECT max(id) FROM member));
 
+-- The first librarian (role LIBRARIAN; the staff code is stored as the card number). Dev password: Admin@12345
+-- Dev only: this password is public in git, so never use this seed on a real installation.
+INSERT INTO member (library_card_no, full_name, email, status, joined_at, role, password_hash, created_at, updated_at) VALUES
+  ('TT-0001', 'Thủ thư mặc định', 'tt-0001@library.local', 'ACTIVE', CURRENT_DATE, 'LIBRARIAN',
+   '$2a$10$D03cLeNmbDzLZ0I.qJqCCOcmt2YoXCd0xT1jXF03m3y3vZCEN0IoW', now(), now())
+ON CONFLICT (library_card_no) DO NOTHING;
+
 -- ===================== catalog_db =====================
 \connect catalog_db
 

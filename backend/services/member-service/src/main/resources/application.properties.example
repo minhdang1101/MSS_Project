@@ -26,11 +26,17 @@ management.endpoints.web.exposure.include=health,info
 app.security.jwt.secret=your_jwt_secret_at_least_32_characters
 app.security.jwt.expiration-minutes=480
 
-# ===== First librarian, created only when the librarian table is empty (leave password empty to skip) =====
-app.bootstrap.librarian.staff-code=TT-0001
-app.bootstrap.librarian.full-name=Thu thu mac dinh
-app.bootstrap.librarian.password=change_me_before_first_run
-
 # ===== Excel import =====
 spring.servlet.multipart.max-file-size=2MB
 spring.servlet.multipart.max-request-size=2MB
+
+# ===== E-mail for the "forgot password" code =====
+# Leave spring.mail.host out while developing: the code is then printed in this service's log instead of mailed.
+# Gmail: use an App Password (Google account > Security > 2-Step Verification > App passwords), not the real password.
+#spring.mail.host=smtp.gmail.com
+#spring.mail.port=587
+#spring.mail.username=your_email@gmail.com
+#spring.mail.password=your_app_password
+#spring.mail.properties.mail.smtp.auth=true
+#spring.mail.properties.mail.smtp.starttls.enable=true
+#app.mail.from=your_email@gmail.com

@@ -1,4 +1,4 @@
-import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 
 const NAV_ITEMS = [
@@ -13,6 +13,7 @@ const NAV_ITEMS = [
 export default function MainLayout() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
+  const { pathname } = useLocation()
 
   const handleLogout = () => {
     logout()
@@ -35,7 +36,7 @@ export default function MainLayout() {
           <button className="logout" type="button" onClick={handleLogout}>Đăng xuất</button>
         </div>
       </aside>
-      <main>
+      <main key={pathname} className="page-in">
         <Outlet />
       </main>
     </div>

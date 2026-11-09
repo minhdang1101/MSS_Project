@@ -42,6 +42,24 @@ CREATE TABLE IF NOT EXISTS book_cover (
 
 ALTER TABLE member ADD COLUMN IF NOT EXISTS password_hash varchar(100);
 
+-- Librarians are now members with role LIBRARIAN: copy the old librarian rows over, then drop that table.
+ALTER TABLE member ADD COLUMN IF NOT EXISTS role varchar(20) NOT NULL DEFAULT 'MEMBER';
+ALTER TABLE member ADD COLUMN IF NOT EXISTS reset_code_hash varchar(100);
+ALTER TABLE member ADD COLUMN IF NOT EXISTS reset_code_expires_at timestamp(6) with time zone;
+ALTER TABLE member ADD COLUMN IF NOT EXISTS reset_code_attempts integer NOT NULL DEFAULT 0;
+ALTER TABLE member ADD COLUMN IF NOT EXISTS reset_code_sent_at timestamp(6) with time zone;
+DO $$
+BEGIN
+    IF to_regclass('public.librarian') IS NOT NULL THEN
+        INSERT INTO member (library_card_no, full_name, email, status, joined_at, role, password_hash, created_at, updated_at)
+        SELECT staff_code, full_name, lower(staff_code) || '@library.local',
+               CASE WHEN active THEN 'ACTIVE' ELSE 'LOCKED' END, created_at::date, 'LIBRARIAN', password_hash, created_at, updated_at
+          FROM librarian
+        ON CONFLICT (library_card_no) DO NOTHING;
+        DROP TABLE librarian;
+    END IF;
+END $$;
+
 -- ===================== loan_db =====================
 \connect loan_db
 

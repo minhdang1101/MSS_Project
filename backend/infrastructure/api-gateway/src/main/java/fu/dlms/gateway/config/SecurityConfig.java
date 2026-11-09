@@ -76,11 +76,14 @@ public class SecurityConfig {
                         // ---- Công khai: không cần token ----
                         .pathMatchers(HttpMethod.OPTIONS).permitAll()                 // CORS preflight
                         .pathMatchers("/actuator/health", "/actuator/health/**").permitAll()
-                        .pathMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
+                        .pathMatchers(HttpMethod.POST, "/api/auth/login", "/api/auth/register",
+                                "/api/auth/forgot-password", "/api/auth/verify-reset-code",
+                                "/api/auth/reset-password").permitAll()
                         .pathMatchers(HttpMethod.GET, "/api/books/**").permitAll()   // tra cứu sách, ảnh bìa
                         // ---- Mọi người đã đăng nhập ----
                         .pathMatchers(HttpMethod.POST, "/api/auth/password").hasAnyRole(LIBRARIAN, MEMBER)
                         // ---- Chỉ độc giả: dữ liệu của chính mình (memberId lấy từ token) ----
+                        .pathMatchers("/api/me/**").hasRole(MEMBER)                   // phiếu mượn, tiền phạt của mình
                         .pathMatchers(HttpMethod.GET, "/api/notifications/me").hasRole(MEMBER)
                         .pathMatchers(HttpMethod.PATCH, "/api/notifications/*/read").hasRole(MEMBER)
                         // ---- Còn lại: chỉ thủ thư (quản lý sách, độc giả, mượn trả, phạt, thông báo...) ----

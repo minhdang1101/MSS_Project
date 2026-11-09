@@ -38,6 +38,9 @@ public class GatewayRoutesConfig {
                 .route("loans", r -> r.path("/api/loans/**").uri(LOAN))
                 // Hiếu: tiền phạt, chính sách phạt, ngày nghỉ
                 .route("fines", r -> r.path("/api/fines/**", "/api/fine-policies/**").uri(FINE))
+                // Độc giả xem phiếu mượn / tiền phạt của chính mình (X-Member-Id lấy từ token)
+                .route("me-loans", r -> r.path("/api/me/loans/**").uri(LOAN))
+                .route("me-fines", r -> r.path("/api/me/fines/**").uri(FINE))
                 // Thành: thông báo nhắc hạn
                 .route("notifications", r -> r.path("/api/notifications/**").uri(NOTIFICATION))
                 .build();

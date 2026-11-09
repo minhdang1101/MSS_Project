@@ -223,3 +223,83 @@ tr.is-late td:first-child{box-shadow:inset 3px 0 0 var(--late)}
 .cover-pick{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
 .cover-preview{width:60px;height:84px;object-fit:cover;border-radius:4px;box-shadow:0 1px 3px rgba(30,59,48,.25)}
 @media (max-width:620px){.form-grid{grid-template-columns:1fr}}
+
+/* sign-up, forgot password, and the reader's shell */
+.auth-links{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.login .card .notice{margin:0 0 14px}
+.reader-shell{min-height:100vh}
+.topbar{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:12px 40px;background:var(--surface);border-bottom:1px solid var(--line)}
+.topbar-actions{display:flex;align-items:center;gap:14px}
+.user-chip-text{display:flex;flex-direction:column;line-height:1.2;text-align:right}
+.user-chip-text small{color:var(--muted);font-size:13px}
+@media (max-width:720px){.topbar{padding:10px 16px}.user-chip-text{display:none}}
+
+/* password box with a show/hide button */
+.pw-wrap{position:relative;display:flex}
+.pw-wrap input{flex:1;min-width:0;padding-right:58px}
+.pw-toggle{all:unset;cursor:pointer;position:absolute;right:6px;top:50%;transform:translateY(-50%);padding:4px 8px;border-radius:4px;font-size:13.5px;color:var(--stamp)}
+.pw-toggle:hover{background:var(--stamp-soft)}
+.pw-toggle:focus-visible{outline:2px solid var(--stamp);outline-offset:1px}
+
+/* ---- motion: loading, entering, feedback. Everything is switched off by the prefers-reduced-motion rule above. ---- */
+@keyframes fade-up{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@keyframes fade-in{from{opacity:0}to{opacity:1}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes shimmer{0%{background-position:-240px 0}100%{background-position:240px 0}}
+@keyframes shake{10%,90%{transform:translateX(-1px)}20%,80%{transform:translateX(2px)}30%,50%,70%{transform:translateX(-4px)}40%,60%{transform:translateX(4px)}}
+@keyframes pop{from{opacity:0;transform:translateY(-4px) scale(.98)}to{opacity:1;transform:none}}
+@keyframes slide-in-right{from{opacity:0;transform:translateX(18px)}to{opacity:1;transform:none}}
+@keyframes dialog-in{from{opacity:0;transform:translateY(14px) scale(.97)}to{opacity:1;transform:none}}
+@keyframes backdrop-in{from{opacity:0}to{opacity:1}}
+@keyframes row-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+/* page and card entrances */
+.page-in{animation:fade-up .35s cubic-bezier(.2,.7,.3,1) both}
+.fade-in{animation:fade-in .3s ease both}
+.card.enter{animation:fade-up .45s cubic-bezier(.2,.7,.3,1) both}
+.step-body{animation:slide-in-right .28s cubic-bezier(.2,.7,.3,1) both}
+.err.pop,.notice{animation:pop .25s ease-out both}
+.field input[aria-invalid="true"]{animation:shake .4s}
+
+/* buttons: press feedback and the spinner while busy */
+.btn{transition:background-color .15s,border-color .15s,transform .1s,box-shadow .15s}
+.btn:not(:disabled):hover{box-shadow:0 2px 6px -2px rgba(30,59,48,.35)}
+.btn:not(:disabled):active{transform:translateY(1px) scale(.985)}
+.btn:disabled{cursor:progress}
+.btn .spinner{margin-right:8px;vertical-align:-3px}
+.spinner{display:inline-block;width:16px;height:16px;border-radius:50%;border:2px solid currentColor;border-right-color:transparent;animation:spin .7s linear infinite}
+.nav a{transition:background-color .15s,transform .15s}
+.nav a:hover{transform:translateX(2px)}
+.field input,.field select{transition:border-color .15s,box-shadow .15s}
+.field input:focus,.field select:focus{border-color:var(--stamp);box-shadow:0 0 0 3px var(--stamp-soft);outline:none}
+
+/* the three steps of "forgot password" */
+.steps{list-style:none;display:flex;justify-content:space-between;gap:6px;margin:0 0 18px;padding:0;counter-reset:s}
+.steps li{display:flex;flex-direction:column;align-items:center;gap:4px;flex:1;position:relative;font-size:12.5px;color:var(--muted);text-align:center}
+.steps li::before{content:"";position:absolute;top:13px;left:calc(-50% + 16px);right:calc(50% + 16px);height:2px;background:var(--line);transition:background-color .4s}
+.steps li:first-child::before{display:none}
+.steps li.done::before,.steps li.now::before{background:var(--ok)}
+.steps-dot{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;background:#fff;border:2px solid var(--line);font-weight:700;font-size:13px;position:relative;z-index:1;transition:background-color .3s,border-color .3s,color .3s,transform .3s}
+.steps li.now .steps-dot{border-color:var(--stamp);color:var(--stamp);transform:scale(1.12)}
+.steps li.done .steps-dot{background:var(--ok);border-color:var(--ok);color:#fff}
+.steps li.now{color:var(--ink);font-weight:700}
+.code-input{font-family:var(--stampface);font-size:24px;letter-spacing:.5em;text-align:center}
+
+/* skeleton: grey placeholder rows with a moving shine while a list loads */
+.skeleton{padding:10px 14px}
+.sk-row{display:flex;align-items:center;gap:16px;padding:12px 0;border-bottom:1px solid #E7ECE8;animation:fade-in .3s both}
+.sk-row:last-child{border-bottom:0}
+.sk-block{display:block;height:14px;border-radius:6px;background:linear-gradient(90deg,#E9EEEA 0,#F6F8F6 120px,#E9EEEA 240px);background-size:480px 100%;animation:shimmer 1.3s linear infinite}
+.sk-avatar{width:46px;height:64px;border-radius:4px}
+.sk-long{flex:3}.sk-mid{flex:2}.sk-short{flex:1}
+
+/* tables: rows ease in one after another */
+tbody tr{animation:row-in .35s ease both}
+tbody tr:nth-child(2){animation-delay:.04s}tbody tr:nth-child(3){animation-delay:.08s}tbody tr:nth-child(4){animation-delay:.12s}
+tbody tr:nth-child(5){animation-delay:.16s}tbody tr:nth-child(6){animation-delay:.2s}tbody tr:nth-child(n+7){animation-delay:.24s}
+
+/* dialogs and toasts */
+.modal[open]{animation:dialog-in .22s cubic-bezier(.2,.7,.3,1) both}
+.modal[open]::backdrop{animation:backdrop-in .22s ease both}
+.toast{transition:opacity .25s,transform .25s;transform:translate(-50%,12px)}
+.toast.on{transform:translate(-50%,0)}

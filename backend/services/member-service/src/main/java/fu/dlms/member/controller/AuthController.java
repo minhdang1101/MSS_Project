@@ -1,6 +1,10 @@
 package fu.dlms.member.controller;
 
 import fu.dlms.member.dto.ChangePasswordRequest;
+import fu.dlms.member.dto.ForgotPasswordRequest;
+import fu.dlms.member.dto.RegisterRequest;
+import fu.dlms.member.dto.ResetPasswordRequest;
+import fu.dlms.member.dto.VerifyResetCodeRequest;
 import fu.dlms.member.dto.LoginRequest;
 import fu.dlms.member.dto.LoginResponse;
 import fu.dlms.member.service.AuthService;
@@ -27,11 +31,34 @@ public class AuthController {
         return authService.login(request);
     }
 
-    /**
-     * Changes the caller's own password. Who the caller is comes from {@code X-User-Role} and {@code X-Username},
-     * which the API gateway sets from the verified token and overwrites on every request, so they cannot be forged
-     * through the gateway. (Like every service, this one must not be reachable except through the gateway.)
-     */
+    /** A reader signs up on their own and is logged in at once. */
+    @PostMapping("/register")
+    @ResponseStatus(HttpStatus.CREATED)
+    public LoginResponse register(@Valid @RequestBody RegisterRequest request) {
+        return authService.register(request);
+    }
+
+    /** Always 204, whether or not the e-mail belongs to an account. */
+    @PostMapping("/forgot-password")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+        authService.requestPasswordReset(request);
+    }
+
+    /** Always the same cheap check: 204 when the code is right, 409 when it is not or has expired. */
+    @PostMapping("/verify-reset-code")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void verifyResetCode(@Valid @RequestBody VerifyResetCodeRequest request) {
+        authService.verifyResetCode(request);
+    }
+
+    @PostMapping("/reset-password")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+        authService.resetPassword(request);
+    }
+
+
     @PostMapping("/password")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void changePassword(@RequestHeader("X-User-Role") String role, @RequestHeader("X-Username") String username,

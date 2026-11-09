@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import bookApi from '../../api/bookApi.js'
 import Modal from '../../components/Modal.jsx'
+import Spinner from '../../components/Spinner.jsx'
 
 const MAX_COVER_BYTES = 1024 * 1024
 const COVER_TYPES = ['image/jpeg', 'image/png']
@@ -145,7 +146,8 @@ export default function BookFormDialog({ onClose, onSaved }) {
         {error && <p className="err" role="alert">{error}</p>}
         <div className="modal-actions">
           <button type="button" className="btn" onClick={onClose}>Huỷ</button>
-          <button type="submit" className="btn primary" disabled={saving}>{saving ? 'Đang lưu...' : 'Thêm sách'}</button>
+          <button type="submit" className="btn primary" disabled={saving}>{saving && <Spinner />}
+            {saving ? 'Đang lưu...' : 'Thêm sách'}</button>
         </div>
       </form>
     </Modal>

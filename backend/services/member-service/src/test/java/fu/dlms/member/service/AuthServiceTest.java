@@ -3,13 +3,12 @@ package fu.dlms.member.service;
 import fu.dlms.member.dto.ChangePasswordRequest;
 import fu.dlms.member.dto.LoginRequest;
 import fu.dlms.member.dto.LoginResponse;
-import fu.dlms.member.entity.Librarian;
 import fu.dlms.member.entity.Member;
+import fu.dlms.member.entity.MemberRole;
 import fu.dlms.member.entity.MemberStatus;
 import fu.dlms.member.exception.BusinessException;
 import fu.dlms.member.exception.InvalidCredentialsException;
 import fu.dlms.member.exception.TooManyLoginAttemptsException;
-import fu.dlms.member.repository.LibrarianRepository;
 import fu.dlms.member.repository.MemberRepository;
 import fu.dlms.member.security.IssuedToken;
 import fu.dlms.member.security.JwtService;
@@ -37,24 +36,25 @@ class AuthServiceTest {
     private static final Instant EXPIRY = Instant.parse("2026-10-26T16:00:00Z");
 
     private final PasswordEncoder encoder = new BCryptPasswordEncoder(4);
-    private final LibrarianRepository librarians = mock(LibrarianRepository.class);
     private final MemberRepository members = mock(MemberRepository.class);
     private final JwtService jwtService = mock(JwtService.class);
     private AuthServiceImpl authService;
-    private Librarian librarian;
+    private Member librarian;
     private Member member;
 
     @BeforeEach
     void setUp() {
-        authService = new AuthServiceImpl(librarians, members, encoder, jwtService, new LoginThrottle(Clock.systemUTC()));
+        authService = new AuthServiceImpl(members, encoder, jwtService, new LoginThrottle(Clock.systemUTC()),
+                mock(MemberService.class),
+                mock(fu.dlms.member.security.ResetCodeMailer.class), Clock.systemUTC());
 
-        librarian = new Librarian();
-        librarian.setStaffCode("TT-0001");
+        librarian = new Member();
+        librarian.setRole(MemberRole.LIBRARIAN);
+        librarian.setLibraryCardNo("TT-0001");
         librarian.setFullName("Nguyễn Thu Trang");
         librarian.setPasswordHash(encoder.encode("correct-password"));
-        librarian.setActive(true);
-        when(librarians.findByStaffCode("TT-0001")).thenReturn(Optional.of(librarian));
-        when(jwtService.issue(any(Librarian.class))).thenReturn(new IssuedToken("librarian-jwt", EXPIRY));
+        librarian.setStatus(MemberStatus.ACTIVE);
+        when(members.findByLibraryCardNo("TT-0001")).thenReturn(Optional.of(librarian));
 
         member = new Member();
         member.setId(5L);
@@ -63,7 +63,8 @@ class AuthServiceTest {
         member.setPasswordHash(encoder.encode("reader-password"));
         member.setStatus(MemberStatus.ACTIVE);
         when(members.findByLibraryCardNo("TV-0412")).thenReturn(Optional.of(member));
-        when(jwtService.issue(any(Member.class))).thenReturn(new IssuedToken("member-jwt", EXPIRY));
+        when(jwtService.issue(any(Member.class))).thenAnswer(i ->
+                new IssuedToken(((Member) i.getArgument(0)).getRole() == MemberRole.LIBRARIAN ? "librarian-jwt" : "member-jwt", EXPIRY));
     }
 
     // ---------- librarians ----------
@@ -88,7 +89,7 @@ class AuthServiceTest {
     void wrongPasswordIsRejectedWithoutIssuingAToken() {
         assertThatThrownBy(() -> authService.login(new LoginRequest("TT-0001", "wrong")))
                 .isInstanceOf(InvalidCredentialsException.class);
-        verify(jwtService, never()).issue(any(Librarian.class));
+        verify(jwtService, never()).issue(any(Member.class));
     }
 
     @Test
@@ -100,7 +101,7 @@ class AuthServiceTest {
 
     @Test
     void deactivatedLibrarianCannotLogInEvenWithCorrectPassword() {
-        librarian.setActive(false);
+        librarian.setStatus(MemberStatus.SUSPENDED);
 
         assertThatThrownBy(() -> authService.login(new LoginRequest("TT-0001", "correct-password")))
                 .isInstanceOf(InvalidCredentialsException.class);
@@ -199,7 +200,7 @@ class AuthServiceTest {
         authService.changePassword("LIBRARIAN", "TT-0001", new ChangePasswordRequest("correct-password", "another-pass-1"));
 
         assertThat(encoder.matches("another-pass-1", librarian.getPasswordHash())).isTrue();
-        verify(librarians).save(librarian);
+        verify(members).save(librarian);
     }
 
     @Test
