@@ -12,4 +12,12 @@ public interface BookService {
     BookResponse findById(Long id);
 
     BookResponse create(BookRequest request);
+
+    List<BookResponse> search(String keyword);
+
+    BookResponse update(Long id, BookRequest request);
+
+    void delete(Long id);
+
+
 }
