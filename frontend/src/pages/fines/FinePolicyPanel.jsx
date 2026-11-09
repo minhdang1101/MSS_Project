@@ -14,13 +14,12 @@ export default function FinePolicyPanel({ policy }) {
             <dd>{policy.maxAmount == null ? 'Không giới hạn' : formatCurrency(policy.maxAmount)}</dd>
           </div>
           <div><dt>Sách điện tử</dt><dd>Không phạt</dd></div>
-          <div><dt>Mất sách</dt><dd>Giá bìa + {formatCurrency(policy.lostBookFee)}</dd></div>
         </dl>
       ) : (
         <p className="error">Không tải được chính sách phạt.</p>
       )}
       <p className="policy-note">
-        Ngày trễ được đếm từ hạn trả đến ngày nhận lại sách. Ngày thư viện đóng cửa không bị tính.
+        Ngày trễ được đếm từ hạn trả đến ngày nhận lại sách. Tiền phạt = (số ngày trễ - ngày ân hạn) x mức phạt mỗi ngày, không quá mức trần.
       </p>
     </aside>
   )

@@ -1,12 +1,9 @@
 package fu.dlms.fine.service;
 
-import fu.dlms.fine.dto.ClosedDayRequest;
 import fu.dlms.fine.dto.FinePolicyRequest;
 import fu.dlms.fine.dto.FinePolicyResponse;
 import fu.dlms.fine.entity.FinePolicy;
-import fu.dlms.fine.exception.BusinessException;
 import fu.dlms.fine.exception.ResourceNotFoundException;
-import fu.dlms.fine.repository.ClosedDayRepository;
 import fu.dlms.fine.repository.FinePolicyRepository;
 import fu.dlms.fine.service.impl.FinePolicyServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
@@ -17,14 +14,13 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class FinePolicyServiceImplTest {
@@ -34,19 +30,18 @@ class FinePolicyServiceImplTest {
     private static final LocalDate TODAY = LocalDate.of(2026, 10, 27);
 
     private final FinePolicyRepository policyRepository = mock(FinePolicyRepository.class);
-    private final ClosedDayRepository closedDayRepository = mock(ClosedDayRepository.class);
     private FinePolicyServiceImpl service;
 
     @BeforeEach
     void setUp() {
-        service = new FinePolicyServiceImpl(policyRepository, closedDayRepository, Clock.fixed(NOW, ZoneOffset.UTC));
+        service = new FinePolicyServiceImpl(policyRepository, Clock.fixed(NOW, ZoneOffset.UTC));
         when(policyRepository.save(any(FinePolicy.class))).thenAnswer(inv -> inv.getArgument(0));
     }
 
     @Test
     void currentPolicyIsLookedUpForTodayInTheLibraryTimeZone() {
         FinePolicy policy = FineCalculatorTest.policy(3000, 1, 150000);
-        when(policyRepository.findFirstByActiveTrueAndEffectiveFromLessThanEqualOrderByEffectiveFromDescIdDesc(TODAY))
+        when(policyRepository.findFirstByEffectiveFromLessThanEqualOrderByEffectiveFromDescIdDesc(TODAY))
                 .thenReturn(Optional.of(policy));
 
         assertThat(service.findCurrent().dailyRate()).isEqualByComparingTo("3000");
@@ -54,39 +49,24 @@ class FinePolicyServiceImplTest {
 
     @Test
     void noCurrentPolicyIsReportedAsNotFound() {
-        when(policyRepository.findFirstByActiveTrueAndEffectiveFromLessThanEqualOrderByEffectiveFromDescIdDesc(TODAY))
+        when(policyRepository.findFirstByEffectiveFromLessThanEqualOrderByEffectiveFromDescIdDesc(TODAY))
                 .thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.findCurrent()).isInstanceOf(ResourceNotFoundException.class);
     }
 
     @Test
-    void createStoresANewActiveVersion() {
-        FinePolicyResponse created = service.create(new FinePolicyRequest(BigDecimal.valueOf(5000), 2, null,
-                BigDecimal.valueOf(30000), TODAY.plusDays(5)));
+    void updateSavesANewActiveVersionAndSwitchesTheOldOneOff() {
+        FinePolicy old = FineCalculatorTest.policy(3000, 1, 150000);
+        when(policyRepository.findByActiveTrue()).thenReturn(List.of(old));
 
-        assertThat(created.active()).isTrue();
-        assertThat(created.maxAmount()).isNull();
-        assertThat(created.effectiveFrom()).isEqualTo(TODAY.plusDays(5));
-    }
+        FinePolicyResponse updated = service.update(new FinePolicyRequest(BigDecimal.valueOf(5000), 2, null,
+                TODAY.plusDays(5)));
 
-    @Test
-    void theLastPolicyInEffectCannotBeDeactivated() {
-        FinePolicy policy = FineCalculatorTest.policy(3000, 1, 150000);
-        when(policyRepository.findById(1L)).thenReturn(Optional.of(policy));
-        when(policyRepository.findFirstByActiveTrueAndEffectiveFromLessThanEqualOrderByEffectiveFromDescIdDesc(TODAY))
-                .thenReturn(Optional.empty());
-
-        assertThatThrownBy(() -> service.deactivate(1L)).isInstanceOf(BusinessException.class);
-    }
-
-    @Test
-    void aDayAlreadyInTheClosedCalendarIsRejected() {
-        when(closedDayRepository.existsById(TODAY)).thenReturn(true);
-
-        assertThatThrownBy(() -> service.addClosedDay(new ClosedDayRequest(TODAY, "Quốc khánh")))
-                .isInstanceOf(BusinessException.class)
-                .hasMessage("Ngày 27/10/2026 đã có trong lịch nghỉ.");
-        verify(closedDayRepository, never()).save(any());
+        assertThat(old.isActive()).isFalse();
+        assertThat(updated.active()).isTrue();
+        assertThat(updated.dailyRate()).isEqualByComparingTo("5000");
+        assertThat(updated.maxAmount()).isNull();
+        assertThat(updated.effectiveFrom()).isEqualTo(TODAY.plusDays(5));
     }
 }

@@ -1,9 +1,10 @@
 package fu.dlms.fine.entity;
 
+/**
+ * UNPAID or PAID. A fine whose book is still out is UNPAID with no returnedAt: its amount grows every day and is
+ * worked out on every read until the book comes back.
+ */
 public enum FineStatus {
-    /** The loan is overdue and the book is still out: the amount grows every day until it comes back. */
-    ACCRUING,
     UNPAID,
-    PAID,
-    WAIVED
+    PAID
 }

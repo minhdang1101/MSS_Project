@@ -10,13 +10,12 @@ public record FinePolicyResponse(
         BigDecimal dailyRate,
         int graceDays,
         BigDecimal maxAmount,
-        BigDecimal lostBookFee,
         boolean active,
         LocalDate effectiveFrom
 ) {
 
     public static FinePolicyResponse from(FinePolicy policy) {
         return new FinePolicyResponse(policy.getId(), policy.getDailyRate(), policy.getGraceDays(),
-                policy.getMaxAmount(), policy.getLostBookFee(), policy.isActive(), policy.getEffectiveFrom());
+                policy.getMaxAmount(), policy.isActive(), policy.getEffectiveFrom());
     }
 }

@@ -9,9 +9,8 @@ import java.util.Optional;
 
 public interface FinePolicyRepository extends JpaRepository<FinePolicy, Long> {
 
-    Optional<FinePolicy> findFirstByActiveTrueAndEffectiveFromLessThanEqualOrderByEffectiveFromDescIdDesc(LocalDate date);
+    /** The version in force on a day: the newest one whose effective date has arrived. */
+    Optional<FinePolicy> findFirstByEffectiveFromLessThanEqualOrderByEffectiveFromDescIdDesc(LocalDate date);
 
-    List<FinePolicy> findAllByOrderByEffectiveFromDescIdDesc();
-
-    long countByActiveTrue();
+    List<FinePolicy> findByActiveTrue();
 }

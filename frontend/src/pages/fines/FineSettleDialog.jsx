@@ -3,23 +3,18 @@ import fineApi from '../../api/fineApi.js'
 import Modal from '../../components/Modal.jsx'
 import { formatCurrency, formatDate } from '../../utils/format.js'
 
-/** Closes an unpaid fine: the librarian either took the money or let the member off. */
+/** Marks an unpaid fine as paid: the librarian took the money at the desk. */
 export default function FineSettleDialog({ fine, onClose, onSettled }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
   const amount = formatCurrency(fine.amount)
 
-  const settle = async (action) => {
+  const pay = async () => {
     setBusy(true)
     setError(null)
     try {
-      if (action === 'pay') {
-        await fineApi.pay(fine.id)
-        onSettled(`Đã thu ${amount} của ${fine.memberName}.`)
-      } else {
-        await fineApi.waive(fine.id)
-        onSettled(`Đã miễn khoản phạt ${amount} cho ${fine.memberName}.`)
-      }
+      await fineApi.pay(fine.id)
+      onSettled(`Đã thu ${amount} của ${fine.memberName}.`)
     } catch (err) {
       setError(err.message ?? 'Không lưu được. Thử lại.')
       setBusy(false)
@@ -39,8 +34,7 @@ export default function FineSettleDialog({ fine, onClose, onSettled }) {
       {error && <p className="err" role="alert" style={{ marginTop: 12 }}>{error}</p>}
       <div className="modal-actions">
         <button type="button" className="btn" onClick={onClose} disabled={busy}>Để sau</button>
-        <button type="button" className="btn" onClick={() => settle('waive')} disabled={busy}>Miễn phạt</button>
-        <button type="button" className="btn primary" onClick={() => settle('pay')} disabled={busy}>
+        <button type="button" className="btn primary" onClick={pay} disabled={busy}>
           Đã thu {amount}
         </button>
       </div>

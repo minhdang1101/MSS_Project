@@ -1,13 +1,11 @@
 package fu.dlms.fine.service;
 
 import fu.dlms.fine.dto.FineResponse;
-import fu.dlms.fine.entity.ClosedDay;
 import fu.dlms.fine.entity.Fine;
 import fu.dlms.fine.entity.FinePolicy;
 import fu.dlms.fine.entity.FineStatus;
 import fu.dlms.fine.exception.BusinessException;
 import fu.dlms.fine.messaging.LoanEvent;
-import fu.dlms.fine.repository.ClosedDayRepository;
 import fu.dlms.fine.repository.FinePolicyRepository;
 import fu.dlms.fine.repository.FineRepository;
 import fu.dlms.fine.service.impl.FineServiceImpl;
@@ -18,7 +16,6 @@ import org.mockito.ArgumentCaptor;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
-import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -39,18 +36,16 @@ class FineServiceImplTest {
 
     private final FineRepository fineRepository = mock(FineRepository.class);
     private final FinePolicyRepository policyRepository = mock(FinePolicyRepository.class);
-    private final ClosedDayRepository closedDayRepository = mock(ClosedDayRepository.class);
     private final FinePolicy policy = FineCalculatorTest.policy(3000, 1, 150000);
     private FineServiceImpl service;
 
     @BeforeEach
     void setUp() {
-        service = new FineServiceImpl(fineRepository, policyRepository, closedDayRepository, new FineCalculator(),
+        service = new FineServiceImpl(fineRepository, policyRepository, new FineCalculator(),
                 Clock.fixed(NOW, ZoneOffset.UTC));
         when(fineRepository.save(any(Fine.class))).thenAnswer(inv -> inv.getArgument(0));
-        when(policyRepository.findFirstByActiveTrueAndEffectiveFromLessThanEqualOrderByEffectiveFromDescIdDesc(any()))
+        when(policyRepository.findFirstByEffectiveFromLessThanEqualOrderByEffectiveFromDescIdDesc(any()))
                 .thenReturn(Optional.of(policy));
-        when(closedDayRepository.findAll()).thenReturn(List.of());
     }
 
     private static Instant daysAgo(int days) {
@@ -62,7 +57,8 @@ class FineServiceImplTest {
                 dueAt.minus(14, ChronoUnit.DAYS), dueAt, returnedAt, returnedAt != null ? returnedAt : NOW);
     }
 
-    private Fine fine(long id, FineStatus status, Instant dueAt, int days, int amount) {
+    /** An UNPAID fine whose book is still out: no return date, stored values are from the day it was opened. */
+    private Fine stillOut(long id, Instant dueAt, int days, int amount) {
         Fine fine = new Fine();
         fine.setId(id);
         fine.setLoanId(100 + id);
@@ -70,11 +66,22 @@ class FineServiceImplTest {
         fine.setBookId(3L);
         fine.setDueAt(dueAt);
         fine.setPolicy(policy);
-        fine.setStatus(status);
+        fine.setStatus(FineStatus.UNPAID);
         fine.setOverdueDays(days);
         fine.setDailyRate(policy.getDailyRate());
         fine.setAmount(BigDecimal.valueOf(amount));
         fine.setCalculatedAt(daysAgo(30));
+        return fine;
+    }
+
+    /** A fine of a returned loan: its days and amount are final. */
+    private Fine returned(long id, FineStatus status, Instant dueAt, int days, int amount) {
+        Fine fine = stillOut(id, dueAt, days, amount);
+        fine.setReturnedAt(daysAgo(1));
+        fine.setStatus(status);
+        if (status == FineStatus.PAID) {
+            fine.setPaidAt(daysAgo(1));
+        }
         return fine;
     }
 
@@ -87,11 +94,12 @@ class FineServiceImplTest {
     // ---------- LoanOverdue ----------
 
     @Test
-    void overdueOpensAnAccruingFineWithTheCurrentPolicy() {
+    void overdueOpensAnUnpaidFineWithTheCurrentPolicy() {
         service.onLoanOverdue(event(1, "PHYSICAL", daysAgo(3), null));
 
         Fine fine = savedFine();
-        assertThat(fine.getStatus()).isEqualTo(FineStatus.ACCRUING);
+        assertThat(fine.getStatus()).isEqualTo(FineStatus.UNPAID);
+        assertThat(fine.getReturnedAt()).isNull();
         assertThat(fine.getLoanId()).isEqualTo(1L);
         assertThat(fine.getBookId()).isEqualTo(3L);
         assertThat(fine.getPolicy()).isSameAs(policy);
@@ -101,7 +109,7 @@ class FineServiceImplTest {
 
     @Test
     void aSecondOverdueEventForTheSameLoanChangesNothing() {
-        when(fineRepository.findByLoanId(1L)).thenReturn(Optional.of(fine(1, FineStatus.ACCRUING, daysAgo(3), 1, 0)));
+        when(fineRepository.findByLoanId(1L)).thenReturn(Optional.of(stillOut(1, daysAgo(3), 1, 0)));
 
         service.onLoanOverdue(event(1, "PHYSICAL", daysAgo(3), null));
 
@@ -126,14 +134,14 @@ class FineServiceImplTest {
     // ---------- LoanReturned ----------
 
     @Test
-    void returnSettlesTheAccruingFineAsUnpaidAtTheDayOfReturn() {
-        Fine accruing = fine(1, FineStatus.ACCRUING, daysAgo(20), 1, 0);
-        when(fineRepository.findByLoanId(101L)).thenReturn(Optional.of(accruing));
+    void returnFinalizesTheFineAtTheDayOfReturn() {
+        Fine open = stillOut(1, daysAgo(20), 1, 0);
+        when(fineRepository.findByLoanId(101L)).thenReturn(Optional.of(open));
 
         service.onLoanReturned(event(101, "PHYSICAL", daysAgo(20), daysAgo(6)));
 
         Fine fine = savedFine();
-        assertThat(fine).isSameAs(accruing);
+        assertThat(fine).isSameAs(open);
         assertThat(fine.getStatus()).isEqualTo(FineStatus.UNPAID);
         assertThat(fine.getOverdueDays()).isEqualTo(14);
         assertThat(fine.getAmount()).isEqualByComparingTo("39000");
@@ -150,13 +158,13 @@ class FineServiceImplTest {
     }
 
     @Test
-    void returnWithinTheGracePeriodRemovesTheAccruingFine() {
-        Fine accruing = fine(1, FineStatus.ACCRUING, daysAgo(1), 1, 0);
-        when(fineRepository.findByLoanId(101L)).thenReturn(Optional.of(accruing));
+    void returnWithinTheGracePeriodRemovesTheOpenFine() {
+        Fine open = stillOut(1, daysAgo(1), 1, 0);
+        when(fineRepository.findByLoanId(101L)).thenReturn(Optional.of(open));
 
         service.onLoanReturned(event(101, "PHYSICAL", daysAgo(1), NOW));
 
-        verify(fineRepository).delete(accruing);
+        verify(fineRepository).delete(open);
         verify(fineRepository, never()).save(any());
     }
 
@@ -170,7 +178,7 @@ class FineServiceImplTest {
 
     @Test
     void aDuplicateReturnEventDoesNotReopenAPaidFine() {
-        Fine paid = fine(1, FineStatus.PAID, daysAgo(20), 14, 39000);
+        Fine paid = returned(1, FineStatus.PAID, daysAgo(20), 14, 39000);
         when(fineRepository.findByLoanId(101L)).thenReturn(Optional.of(paid));
 
         service.onLoanReturned(event(101, "PHYSICAL", daysAgo(20), NOW));
@@ -180,28 +188,16 @@ class FineServiceImplTest {
         verify(fineRepository, never()).save(any());
     }
 
-    @Test
-    void closedDaysAreLeftOutWhenTheFineIsSettled() {
-        LocalDate holiday = LocalDate.of(2026, 10, 20);
-        ClosedDay closed = new ClosedDay();
-        closed.setDate(holiday);
-        when(closedDayRepository.findAll()).thenReturn(List.of(closed));
-
-        service.onLoanReturned(event(1, "PHYSICAL", daysAgo(10), NOW));
-
-        assertThat(savedFine().getOverdueDays()).isEqualTo(9);
-    }
-
     // ---------- listing ----------
 
     @Test
-    void accruingFinesAreWorkedOutUpToTodayAndListedFirst() {
-        Fine settled = fine(1, FineStatus.UNPAID, daysAgo(40), 2, 3000);
-        settled.setCalculatedAt(daysAgo(1));
-        Fine accruing = fine(2, FineStatus.ACCRUING, daysAgo(43), 1, 0); // stored values are from day one
-        when(fineRepository.findAll()).thenReturn(List.of(settled, accruing));
+    void finesOfUnreturnedBooksAreWorkedOutUpToTodayAndListedFirst() {
+        Fine final1 = returned(1, FineStatus.UNPAID, daysAgo(40), 2, 3000);
+        final1.setCalculatedAt(daysAgo(1));
+        Fine open = stillOut(2, daysAgo(43), 1, 0); // stored values are from day one
+        when(fineRepository.findAll()).thenReturn(List.of(final1, open));
 
-        List<FineResponse> fines = service.findAll();
+        List<FineResponse> fines = service.findAll(null);
 
         assertThat(fines).extracting(FineResponse::id).containsExactly(2L, 1L);
         assertThat(fines.get(0).overdueDays()).isEqualTo(43);
@@ -209,42 +205,47 @@ class FineServiceImplTest {
         assertThat(fines.get(1).amount()).isEqualByComparingTo("3000");
     }
 
-    // ---------- pay / waive ----------
+    @Test
+    void findAllCanBeFilteredByStatus() {
+        Fine unpaid = returned(1, FineStatus.UNPAID, daysAgo(10), 10, 27000);
+        Fine paid = returned(2, FineStatus.PAID, daysAgo(10), 10, 27000);
+        when(fineRepository.findAll()).thenReturn(List.of(unpaid, paid));
+
+        assertThat(service.findAll(FineStatus.PAID)).extracting(FineResponse::id).containsExactly(2L);
+    }
 
     @Test
-    void payMarksAnUnpaidFineAsPaidNow() {
-        when(fineRepository.findById(1L)).thenReturn(Optional.of(fine(1, FineStatus.UNPAID, daysAgo(10), 10, 27000)));
+    void aMemberOnlySeesTheirOwnFines() {
+        when(fineRepository.findByMemberId(7L)).thenReturn(List.of(returned(1, FineStatus.UNPAID, daysAgo(10), 10, 27000)));
 
-        FineResponse paid = service.pay(1L);
+        assertThat(service.findByMember(7L)).extracting(FineResponse::memberId).containsExactly(7L);
+    }
+
+    // ---------- paid ----------
+
+    @Test
+    void markPaidSetsAnUnpaidFineOfAReturnedBookToPaidNow() {
+        when(fineRepository.findById(1L)).thenReturn(Optional.of(returned(1, FineStatus.UNPAID, daysAgo(10), 10, 27000)));
+
+        FineResponse paid = service.markPaid(1L);
 
         assertThat(paid.status()).isEqualTo(FineStatus.PAID);
         assertThat(paid.paidAt()).isEqualTo(NOW);
     }
 
     @Test
-    void anAccruingFineCannotBeCollectedBeforeTheBookIsBack() {
-        when(fineRepository.findById(1L)).thenReturn(Optional.of(fine(1, FineStatus.ACCRUING, daysAgo(10), 1, 0)));
+    void aFineCannotBeCollectedBeforeTheBookIsBack() {
+        when(fineRepository.findById(1L)).thenReturn(Optional.of(stillOut(1, daysAgo(10), 1, 0)));
 
-        assertThatThrownBy(() -> service.pay(1L))
+        assertThatThrownBy(() -> service.markPaid(1L))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("chưa được trả");
     }
 
     @Test
-    void aSettledFineCannotBeWaivedOrPaidAgain() {
-        when(fineRepository.findById(1L)).thenReturn(Optional.of(fine(1, FineStatus.PAID, daysAgo(10), 10, 27000)));
+    void aPaidFineCannotBePaidAgain() {
+        when(fineRepository.findById(1L)).thenReturn(Optional.of(returned(1, FineStatus.PAID, daysAgo(10), 10, 27000)));
 
-        assertThatThrownBy(() -> service.waive(1L)).hasMessage("Khoản phạt này đã được thu.");
-        assertThatThrownBy(() -> service.pay(1L)).hasMessage("Khoản phạt này đã được thu.");
-    }
-
-    @Test
-    void waiveClosesAnUnpaidFineWithoutCollectingIt() {
-        when(fineRepository.findById(1L)).thenReturn(Optional.of(fine(1, FineStatus.UNPAID, daysAgo(10), 10, 27000)));
-
-        FineResponse waived = service.waive(1L);
-
-        assertThat(waived.status()).isEqualTo(FineStatus.WAIVED);
-        assertThat(waived.paidAt()).isNull();
+        assertThatThrownBy(() -> service.markPaid(1L)).hasMessage("Khoản phạt này đã được thu.");
     }
 }

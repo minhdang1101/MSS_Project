@@ -90,8 +90,8 @@ SELECT setval(pg_get_serial_sequence('loan', 'id'), (SELECT max(id) FROM loan));
 \connect fine_db
 
 -- 3.000đ/day after 1 grace day, capped at 150.000đ per loan
-INSERT INTO fine_policy (id, daily_rate, grace_days, max_amount, lost_book_fee, active, effective_from) VALUES
-  (1, 3000.00, 1, 150000.00, 20000.00, true, '2026-01-01')
+INSERT INTO fine_policy (id, daily_rate, grace_days, max_amount, active, effective_from) VALUES
+  (1, 3000.00, 1, 150000.00, true, '2026-01-01')
 ON CONFLICT DO NOTHING;
 SELECT setval(pg_get_serial_sequence('fine_policy', 'id'), (SELECT max(id) FROM fine_policy));
 

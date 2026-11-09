@@ -6,9 +6,9 @@
 -- Run with psql (uses \connect):  psql -U <user> -f 03-upgrade-existing.sql
 --
 -- What changed since the first schema:
---   fine_policy  + lost_book_fee
---   fine         + book_id, due_at, returned_at, policy_id, version; status may now be ACCRUING
---   closed_day   new table (days the library is closed)
+--   fine_policy  (no change; lost_book_fee was removed again)
+--   fine         + book_id, due_at, returned_at, policy_id, version; status is UNPAID or PAID
+--   closed_day   dropped (not part of the design)
 --   loan         + due_soon_notified_at
 --   book         + category, language; new table book_cover (cover pictures)
 --   member       + password_hash (reader login)
@@ -68,12 +68,8 @@ ALTER TABLE loan ADD COLUMN IF NOT EXISTS due_soon_notified_at timestamp(6) with
 -- ===================== fine_db =====================
 \connect fine_db
 
--- fine_policy: the old rows get the service's default lost-book fee (app.fine.default-policy.lost-book-fee)
-ALTER TABLE fine_policy ADD COLUMN IF NOT EXISTS lost_book_fee numeric(12, 2);
-UPDATE fine_policy SET lost_book_fee = 20000.00 WHERE lost_book_fee IS NULL;
-ALTER TABLE fine_policy ALTER COLUMN lost_book_fee SET NOT NULL;
-ALTER TABLE fine_policy DROP CONSTRAINT IF EXISTS fine_policy_lost_book_fee_check;
-ALTER TABLE fine_policy ADD CONSTRAINT fine_policy_lost_book_fee_check CHECK (lost_book_fee >= 0);
+-- fine_policy: lost_book_fee is not part of the fine rules any more
+ALTER TABLE fine_policy DROP COLUMN IF EXISTS lost_book_fee;
 
 -- fine: add the columns nullable first, fill the existing rows, then make them required
 ALTER TABLE fine ADD COLUMN IF NOT EXISTS book_id     bigint;
@@ -85,6 +81,8 @@ ALTER TABLE fine ADD COLUMN IF NOT EXISTS version     bigint;
 -- A fine is only created when a loan is returned late, so it was calculated at the return moment, and the loan was
 -- due overdue_days before that.
 UPDATE fine SET returned_at = calculated_at WHERE returned_at IS NULL AND status <> 'ACCRUING';
+-- ACCRUING no longer exists: a fine whose book is still out is UNPAID with no returned_at
+UPDATE fine SET status = 'UNPAID' WHERE status = 'ACCRUING';
 UPDATE fine SET due_at = calculated_at - overdue_days * interval '1 day' WHERE due_at IS NULL;
 -- The rules in force: the active policy (else the newest one)
 UPDATE fine SET policy_id = (SELECT id FROM fine_policy ORDER BY active DESC, effective_from DESC, id LIMIT 1)
@@ -100,14 +98,11 @@ ALTER TABLE fine ALTER COLUMN book_id   SET NOT NULL;
 ALTER TABLE fine ALTER COLUMN due_at    SET NOT NULL;
 ALTER TABLE fine ALTER COLUMN policy_id SET NOT NULL;
 
--- A fine can now be ACCRUING (loan overdue and the book still out); the old CHECK only allowed three values
+-- Only UNPAID and PAID remain (WAIVED rows, if any, make this fail loudly: settle them by hand first)
 ALTER TABLE fine DROP CONSTRAINT IF EXISTS fine_status_check;
-ALTER TABLE fine ADD CONSTRAINT fine_status_check CHECK (status IN ('ACCRUING', 'UNPAID', 'PAID', 'WAIVED'));
+ALTER TABLE fine ADD CONSTRAINT fine_status_check CHECK (status IN ('UNPAID', 'PAID'));
 
-CREATE TABLE IF NOT EXISTS closed_day (
-    closed_on date PRIMARY KEY,
-    reason    varchar(200)
-);
+DROP TABLE IF EXISTS closed_day;
 
 -- ===================== notification_db =====================
 \connect notification_db

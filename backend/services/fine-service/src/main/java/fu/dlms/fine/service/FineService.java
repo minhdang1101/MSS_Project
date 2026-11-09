@@ -1,24 +1,25 @@
 package fu.dlms.fine.service;
 
 import fu.dlms.fine.dto.FineResponse;
+import fu.dlms.fine.entity.FineStatus;
 import fu.dlms.fine.messaging.LoanEvent;
 
 import java.util.List;
 
 public interface FineService {
 
-    /** ACCRUING fines first (their amount is worked out up to now), then the most recently calculated. */
-    List<FineResponse> findAll();
+    /** Every fine, optionally only those with the given status. Unreturned books are worked out up to now. */
+    List<FineResponse> findAll(FineStatus status);
 
+    /** The fines of one member (My Fines). */
     List<FineResponse> findByMember(Long memberId);
 
-    FineResponse pay(Long fineId);
+    /** Librarian marks a fine as paid at the desk. Only possible once the book is back. */
+    FineResponse markPaid(Long fineId);
 
-    FineResponse waive(Long fineId);
-
-    /** Opens an ACCRUING fine for the loan. Does nothing when the loan already has a fine. */
+    /** Opens a fine for the loan (UNPAID, still growing). Does nothing when the loan already has a fine. */
     void onLoanOverdue(LoanEvent event);
 
-    /** Settles the loan's fine as UNPAID, or drops it when nothing is owed. Does nothing once it is settled. */
+    /** Finalizes the loan's fine, or drops it when nothing is owed. Does nothing once it is finalized. */
     void onLoanReturned(LoanEvent event);
 }

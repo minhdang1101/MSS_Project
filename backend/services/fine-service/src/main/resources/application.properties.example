@@ -1,5 +1,5 @@
 spring.application.name=fine-service
-server.port=8084
+server.port=8085
 
 # ===== PostgreSQL (fine_db) =====
 spring.datasource.url=jdbc:postgresql://localhost:5432/fine_db
@@ -18,6 +18,9 @@ spring.jpa.properties.hibernate.jdbc.time_zone=UTC
 # ===== Eureka =====
 eureka.client.service-url.defaultZone=${EUREKA_URL:http://localhost:8761/eureka/}
 eureka.instance.prefer-ip-address=true
+
+# ===== OpenAPI =====
+springdoc.swagger-ui.path=/swagger-ui.html
 
 # ===== Actuator =====
 management.endpoints.web.exposure.include=health,info
@@ -39,4 +42,3 @@ app.fine.default-policy.daily-rate=3000
 app.fine.default-policy.grace-days=1
 # leave empty for no ceiling
 app.fine.default-policy.max-amount=150000
-app.fine.default-policy.lost-book-fee=20000
