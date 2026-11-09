@@ -1,14 +1,12 @@
 package fu.dlms.fine.service.impl;
 
 import fu.dlms.fine.dto.FineResponse;
-import fu.dlms.fine.entity.ClosedDay;
 import fu.dlms.fine.entity.Fine;
 import fu.dlms.fine.entity.FinePolicy;
 import fu.dlms.fine.entity.FineStatus;
 import fu.dlms.fine.exception.BusinessException;
 import fu.dlms.fine.exception.ResourceNotFoundException;
 import fu.dlms.fine.messaging.LoanEvent;
-import fu.dlms.fine.repository.ClosedDayRepository;
 import fu.dlms.fine.repository.FinePolicyRepository;
 import fu.dlms.fine.repository.FineRepository;
 import fu.dlms.fine.service.FineCalculator;
@@ -24,8 +22,6 @@ import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -39,13 +35,16 @@ public class FineServiceImpl implements FineService {
 
     private final FineRepository fineRepository;
     private final FinePolicyRepository finePolicyRepository;
-    private final ClosedDayRepository closedDayRepository;
     private final FineCalculator calculator;
     private final Clock clock;
 
     @Override
-    public List<FineResponse> findAll() {
-        return toResponses(fineRepository.findAll());
+    public List<FineResponse> findAll(FineStatus status) {
+        List<Fine> fines = fineRepository.findAll();
+        if (status != null) {
+            fines = fines.stream().filter(fine -> fine.getStatus() == status).toList();
+        }
+        return toResponses(fines);
     }
 
     @Override
@@ -55,18 +54,18 @@ public class FineServiceImpl implements FineService {
 
     @Override
     @Transactional
-    public FineResponse pay(Long fineId) {
-        Fine fine = loadUnpaid(fineId);
+    public FineResponse markPaid(Long fineId) {
+        Fine fine = fineRepository.findById(fineId)
+                .orElseThrow(() -> new ResourceNotFoundException("Fine", fineId));
+        if (fine.getStatus() == FineStatus.PAID) {
+            throw new BusinessException("Khoản phạt này đã được thu.");
+        }
+        if (isBookStillOut(fine)) {
+            throw new BusinessException("Sách chưa được trả nên tiền phạt vẫn đang tăng. "
+                    + "Chỉ thu phạt sau khi nhận lại sách.");
+        }
         fine.setStatus(FineStatus.PAID);
         fine.setPaidAt(clock.instant());
-        return FineResponse.from(fine);
-    }
-
-    @Override
-    @Transactional
-    public FineResponse waive(Long fineId) {
-        Fine fine = loadUnpaid(fineId);
-        fine.setStatus(FineStatus.WAIVED);
         return FineResponse.from(fine);
     }
 
@@ -81,8 +80,7 @@ public class FineServiceImpl implements FineService {
             return;
         }
         Fine fine = newFine(event);
-        fine.setStatus(FineStatus.ACCRUING);
-        recalculate(fine, clock.instant(), closedDays());
+        recalculate(fine, clock.instant());
         fineRepository.save(fine);
     }
 
@@ -93,8 +91,8 @@ public class FineServiceImpl implements FineService {
             return;
         }
         Optional<Fine> existing = fineRepository.findByLoanId(event.loanId());
-        if (existing.isPresent() && existing.get().getStatus() != FineStatus.ACCRUING) {
-            log.debug("Fine for loan {} is already settled; LoanReturned {} ignored", event.loanId(), event.eventId());
+        if (existing.isPresent() && !isBookStillOut(existing.get())) {
+            log.debug("Fine for loan {} is already final; LoanReturned {} ignored", event.loanId(), event.eventId());
             return;
         }
         Instant returnedAt = event.returnedAt() != null ? event.returnedAt() : event.occurredAt();
@@ -102,9 +100,9 @@ public class FineServiceImpl implements FineService {
             throw new IllegalArgumentException("LoanReturned " + event.eventId() + " has neither returnedAt nor occurredAt");
         }
 
-        // No LoanOverdue seen (returned before the overdue scan ran, or events reordered): settle in one step.
+        // No LoanOverdue seen (returned before the overdue scan ran, or events reordered): finalize in one step.
         Fine fine = existing.orElseGet(() -> newFine(event));
-        recalculate(fine, returnedAt, closedDays());
+        recalculate(fine, returnedAt);
         if (fine.getAmount().signum() == 0) {
             existing.ifPresent(fineRepository::delete); // back within the grace period: nothing owed
             return;
@@ -114,18 +112,9 @@ public class FineServiceImpl implements FineService {
         fineRepository.save(fine);
     }
 
-    private Fine loadUnpaid(Long fineId) {
-        Fine fine = fineRepository.findById(fineId)
-                .orElseThrow(() -> new ResourceNotFoundException("Fine", fineId));
-        if (fine.getStatus() == FineStatus.ACCRUING) {
-            throw new BusinessException("Sách chưa được trả nên tiền phạt vẫn đang tăng. "
-                    + "Chỉ thu hoặc miễn phạt sau khi nhận lại sách.");
-        }
-        if (fine.getStatus() != FineStatus.UNPAID) {
-            throw new BusinessException(fine.getStatus() == FineStatus.PAID
-                    ? "Khoản phạt này đã được thu." : "Khoản phạt này đã được miễn.");
-        }
-        return fine;
+    /** An UNPAID fine with no return date: the amount keeps growing until the book comes back. */
+    private static boolean isBookStillOut(Fine fine) {
+        return fine.getReturnedAt() == null;
     }
 
     /** Digital loans are never fined. Throws on an event too incomplete to act on, so it ends up in the DLQ. */
@@ -146,18 +135,19 @@ public class FineServiceImpl implements FineService {
         fine.setMemberId(event.memberId());
         fine.setBookId(event.bookId());
         fine.setDueAt(event.dueAt());
+        fine.setStatus(FineStatus.UNPAID);
         fine.setPolicy(currentPolicy());
         return fine;
     }
 
     private FinePolicy currentPolicy() {
         LocalDate today = FineCalculator.libraryDate(clock.instant());
-        return finePolicyRepository.findFirstByActiveTrueAndEffectiveFromLessThanEqualOrderByEffectiveFromDescIdDesc(today)
+        return finePolicyRepository.findFirstByEffectiveFromLessThanEqualOrderByEffectiveFromDescIdDesc(today)
                 .orElseThrow(() -> new IllegalStateException("No fine policy is in effect on " + today));
     }
 
-    private void recalculate(Fine fine, Instant until, Set<LocalDate> closedDays) {
-        int lateDays = calculator.lateDays(fine.getDueAt(), until, closedDays);
+    private void recalculate(Fine fine, Instant until) {
+        int lateDays = calculator.lateDays(fine.getDueAt(), until);
         fine.setOverdueDays(lateDays);
         fine.setDailyRate(fine.getPolicy().getDailyRate());
         fine.setAmount(calculator.amount(lateDays, fine.getPolicy()));
@@ -166,22 +156,14 @@ public class FineServiceImpl implements FineService {
 
     private List<FineResponse> toResponses(List<Fine> fines) {
         Instant now = clock.instant();
-        Set<LocalDate> closedDays = fines.stream().anyMatch(f -> f.getStatus() == FineStatus.ACCRUING)
-                ? closedDays() : Set.of();
         return fines.stream()
-                .map(fine -> fine.getStatus() == FineStatus.ACCRUING ? accruedSoFar(fine, now, closedDays)
-                        : FineResponse.from(fine))
+                .map(fine -> isBookStillOut(fine) ? accruedSoFar(fine, now) : FineResponse.from(fine))
                 .sorted(NEWEST_FIRST)
                 .toList();
     }
 
-    private FineResponse accruedSoFar(Fine fine, Instant now, Set<LocalDate> closedDays) {
-        int lateDays = calculator.lateDays(fine.getDueAt(), now, closedDays);
+    private FineResponse accruedSoFar(Fine fine, Instant now) {
+        int lateDays = calculator.lateDays(fine.getDueAt(), now);
         return FineResponse.from(fine, lateDays, calculator.amount(lateDays, fine.getPolicy()), now);
-    }
-
-    /** The closed-day calendar is a handful of holidays a year, so it is read whole. */
-    private Set<LocalDate> closedDays() {
-        return closedDayRepository.findAll().stream().map(ClosedDay::getDate).collect(Collectors.toSet());
     }
 }

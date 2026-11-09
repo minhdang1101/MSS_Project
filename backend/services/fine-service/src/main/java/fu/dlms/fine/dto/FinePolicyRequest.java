@@ -9,7 +9,7 @@ import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
-/** A new version of the fine rules. maxAmount may be left empty for no ceiling. */
+/** New fine rules (PUT /api/fines/policy). maxAmount may be left empty for no ceiling. */
 public record FinePolicyRequest(
         @NotNull(message = "Nhập mức phạt mỗi ngày")
         @DecimalMin(value = "0", message = "Mức phạt không được âm")
@@ -24,11 +24,6 @@ public record FinePolicyRequest(
         @DecimalMin(value = "0", message = "Mức trần không được âm")
         @Digits(integer = 10, fraction = 2, message = "Số tiền không hợp lệ")
         BigDecimal maxAmount,
-
-        @NotNull(message = "Nhập phí mất sách")
-        @DecimalMin(value = "0", message = "Phí mất sách không được âm")
-        @Digits(integer = 10, fraction = 2, message = "Số tiền không hợp lệ")
-        BigDecimal lostBookFee,
 
         @NotNull(message = "Chọn ngày bắt đầu áp dụng")
         LocalDate effectiveFrom

@@ -7,7 +7,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 import java.util.Optional;
 
-/** The policy is fetched with every fine: ACCRUING fines need it to work out today's amount. */
+/** The policy is fetched with every fine: a fine whose book is still out needs it to work out today's amount. */
 public interface FineRepository extends JpaRepository<Fine, Long> {
 
     @Override

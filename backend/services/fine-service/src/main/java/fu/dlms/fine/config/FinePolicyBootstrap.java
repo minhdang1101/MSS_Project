@@ -15,7 +15,7 @@ import java.time.Clock;
 
 /**
  * Creates the first fine policy from app.fine.default-policy.* when the table is empty, so overdue loans can be
- * fined from the first run. Later changes go through POST /api/fine-policies.
+ * fined from the first run. Later changes go through PUT /api/fines/policy.
  */
 @Slf4j
 @Component
@@ -35,9 +35,6 @@ public class FinePolicyBootstrap implements ApplicationRunner {
     @Value("${app.fine.default-policy.max-amount:150000}")
     private BigDecimal maxAmount;
 
-    @Value("${app.fine.default-policy.lost-book-fee:20000}")
-    private BigDecimal lostBookFee;
-
     @Override
     public void run(ApplicationArguments args) {
         if (finePolicyRepository.count() > 0) {
@@ -47,7 +44,6 @@ public class FinePolicyBootstrap implements ApplicationRunner {
         policy.setDailyRate(dailyRate);
         policy.setGraceDays(graceDays);
         policy.setMaxAmount(maxAmount);
-        policy.setLostBookFee(lostBookFee);
         policy.setActive(true);
         policy.setEffectiveFrom(FineCalculator.libraryDate(clock.instant()));
         finePolicyRepository.save(policy);

@@ -34,7 +34,7 @@ const fetchFines = async () => {
 
 export default function FineListPage() {
   const { data, loading, error, reload } = useFetch(fetchFines)
-  const [settling, setSettling] = useState(null) // the UNPAID fine being collected or waived
+  const [settling, setSettling] = useState(null) // the UNPAID fine being collected
   const [notice, setNotice] = useState(null)
   const clearNotice = useCallback(() => setNotice(null), [])
 
@@ -60,8 +60,11 @@ export default function FineListPage() {
     {
       key: 'status',
       label: 'Trạng thái',
-      render: (f) => (f.status === 'UNPAID'
-        ? <StatusBadge status={f.status} onClick={() => setSettling(f)} title="Thu tiền hoặc miễn phạt" />
+      // UNPAID with no return date: the book is still out and the amount is still growing
+      render: (f) => (f.status === 'UNPAID' && f.returnedAt == null
+        ? <StatusBadge status="ACCRUING" />
+        : f.status === 'UNPAID'
+        ? <StatusBadge status={f.status} onClick={() => setSettling(f)} title="Thu tiền phạt" />
         : <StatusBadge status={f.status} />),
     },
   ]

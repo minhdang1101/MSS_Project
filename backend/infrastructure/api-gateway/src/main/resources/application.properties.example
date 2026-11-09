@@ -23,7 +23,7 @@ spring.cloud.gateway.server.webflux.routes[2].uri=lb://loan-service
 spring.cloud.gateway.server.webflux.routes[2].predicates[0]=Path=/api/loans/**
 spring.cloud.gateway.server.webflux.routes[3].id=fines
 spring.cloud.gateway.server.webflux.routes[3].uri=lb://fine-service
-spring.cloud.gateway.server.webflux.routes[3].predicates[0]=Path=/api/fines/**,/api/fine-policies/**
+spring.cloud.gateway.server.webflux.routes[3].predicates[0]=Path=/api/fines/**
 spring.cloud.gateway.server.webflux.routes[4].id=notifications
 spring.cloud.gateway.server.webflux.routes[4].uri=lb://notification-service
 spring.cloud.gateway.server.webflux.routes[4].predicates[0]=Path=/api/notifications/**

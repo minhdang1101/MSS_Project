@@ -137,7 +137,6 @@ CREATE TABLE IF NOT EXISTS fine_policy (
     daily_rate     numeric(12, 2) NOT NULL CHECK (daily_rate >= 0),
     grace_days     integer        NOT NULL CHECK (grace_days >= 0),
     max_amount     numeric(12, 2) CHECK (max_amount >= 0),
-    lost_book_fee  numeric(12, 2) NOT NULL CHECK (lost_book_fee >= 0),
     active         boolean        NOT NULL,
     effective_from date           NOT NULL
 );
@@ -158,7 +157,7 @@ CREATE TABLE IF NOT EXISTS fine (
     overdue_days  integer        NOT NULL CHECK (overdue_days >= 0),
     daily_rate    numeric(12, 2) NOT NULL,
     amount        numeric(12, 2) NOT NULL CHECK (amount >= 0),
-    status        varchar(20)    NOT NULL CHECK (status IN ('ACCRUING', 'UNPAID', 'PAID', 'WAIVED')),
+    status        varchar(20)    NOT NULL CHECK (status IN ('UNPAID', 'PAID')),
     calculated_at timestamp(6) with time zone NOT NULL,
     paid_at       timestamp(6) with time zone,
     version       bigint,
@@ -166,11 +165,6 @@ CREATE TABLE IF NOT EXISTS fine (
 );
 CREATE INDEX IF NOT EXISTS idx_fine_member_status ON fine (member_id, status);
 
--- Days the library is closed: not counted as late
-CREATE TABLE IF NOT EXISTS closed_day (
-    closed_on date PRIMARY KEY,
-    reason    varchar(200)
-);
 
 -- ===================== notification_db (notification-service) =====================
 \connect notification_db

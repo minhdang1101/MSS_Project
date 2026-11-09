@@ -16,7 +16,7 @@ export default function DashboardPage() {
   const today = new Date().toLocaleDateString('vi-VN', { weekday: 'long', day: 'numeric', month: 'long' })
   const open = data?.loans.filter((l) => l.status !== 'RETURNED') ?? []
   const overdue = open.filter((l) => l.status === 'OVERDUE')
-  const unpaid = data?.fines.filter((f) => f.status === 'UNPAID') ?? []
+  const unpaid = data?.fines.filter((f) => f.status === 'UNPAID' && f.returnedAt != null) ?? []
   const unpaidTotal = unpaid.reduce((sum, f) => sum + Number(f.amount), 0)
 
   return (

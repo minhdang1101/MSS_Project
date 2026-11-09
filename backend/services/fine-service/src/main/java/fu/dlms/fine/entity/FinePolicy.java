@@ -38,10 +38,7 @@ public class FinePolicy {
     @Column(name = "max_amount", precision = 12, scale = 2)
     private BigDecimal maxAmount;
 
-    /** Charged on top of the cover price when a book is lost. */
-    @Column(name = "lost_book_fee", nullable = false, precision = 12, scale = 2)
-    private BigDecimal lostBookFee;
-
+    /** True for the newest version only; saving a new version switches the older ones off. */
     @Column(nullable = false)
     private boolean active;
 

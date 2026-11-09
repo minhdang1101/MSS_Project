@@ -54,7 +54,7 @@ public class Fine {
     @JoinColumn(name = "policy_id", nullable = false)
     private FinePolicy policy;
 
-    /** Days late (closed days excluded) before the grace period is taken off. Stale while ACCRUING. */
+    /** Days late before the grace period is taken off. Stale while the book is still out (returnedAt is null). */
     @Column(name = "overdue_days", nullable = false)
     private int overdueDays;
 
@@ -62,7 +62,7 @@ public class Fine {
     @Column(name = "daily_rate", nullable = false, precision = 12, scale = 2)
     private BigDecimal dailyRate;
 
-    /** Stale while ACCRUING: the API recalculates it up to today on every read. */
+    /** Stale while the book is still out: the API recalculates it up to today on every read. */
     @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal amount;
 
