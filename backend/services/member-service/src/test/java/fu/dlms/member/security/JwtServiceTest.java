@@ -1,6 +1,7 @@
 package fu.dlms.member.security;
 
-import fu.dlms.member.entity.Librarian;
+import fu.dlms.member.entity.Member;
+import fu.dlms.member.entity.MemberRole;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.BadJwtException;
@@ -26,9 +27,11 @@ class JwtServiceTest {
 
     private final Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
 
-    private static Librarian librarian() {
-        Librarian l = new Librarian();
-        l.setStaffCode("TT-0001");
+    private static Member librarian() {
+        Member l = new Member();
+        l.setRole(MemberRole.LIBRARIAN);
+        l.setId(1L);
+        l.setLibraryCardNo("TT-0001");
         l.setFullName("Nguyễn Thu Trang");
         return l;
     }

@@ -1,8 +1,8 @@
 package fu.dlms.member.security;
 
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
-import fu.dlms.member.entity.Librarian;
 import fu.dlms.member.entity.Member;
+import fu.dlms.member.entity.MemberRole;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.JwsHeader;
 import org.springframework.security.oauth2.jwt.JwtClaimsSet;
@@ -44,17 +44,14 @@ public class JwtService {
         this.clock = clock;
     }
 
-    /** A staff token: role LIBRARIAN, no member id. */
-    public IssuedToken issue(Librarian librarian) {
-        return issue(librarian.getStaffCode(), librarian.getFullName(), "LIBRARIAN", null);
-    }
-
     /**
-     * A reader token: role MEMBER, subject = card number. The member id ("mid") is what the gateway forwards to the
-     * services so a reader can only ever be answered with their own data.
+     * A token for a librarian or a reader: subject = card number (or staff code), role = LIBRARIAN or MEMBER. A
+     * reader's member id ("mid") is what the gateway forwards to the services so a reader can only ever be
+     * answered with their own data.
      */
-    public IssuedToken issue(Member member) {
-        return issue(member.getLibraryCardNo(), member.getFullName(), "MEMBER", member.getId());
+    public IssuedToken issue(Member account) {
+        boolean reader = account.getRole() == MemberRole.MEMBER;
+        return issue(account.getLibraryCardNo(), account.getFullName(), account.getRole().name(), reader ? account.getId() : null);
     }
 
     private IssuedToken issue(String subject, String name, String role, Long memberId) {

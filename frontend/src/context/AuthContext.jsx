@@ -5,36 +5,34 @@ import { tokenStorage } from '../utils/storage.js'
 const AuthContext = createContext(null)
 
 export function AuthProvider({ children }) {
-  const [token, setToken] = useState(tokenStorage.get())
-  const [user, setUser] = useState(tokenStorage.getUser())
+  const [session, setSession] = useState({
+    token: tokenStorage.get(),
+    user: tokenStorage.getUser(),
+    role: tokenStorage.getRole(),
+    username: tokenStorage.getUsername(),
+  })
 
   // The gateway rejected our token (expired / invalid): drop the session so RequireAuth redirects to /login.
   useEffect(() => {
-    const onUnauthorized = () => {
-      setToken(null)
-      setUser(null)
-    }
+    const onUnauthorized = () => setSession({ token: null, user: null, role: null, username: null })
     window.addEventListener(UNAUTHORIZED_EVENT, onUnauthorized)
     return () => window.removeEventListener(UNAUTHORIZED_EVENT, onUnauthorized)
   }, [])
 
   const value = useMemo(
     () => ({
-      token,
-      user,
-      isAuthenticated: Boolean(token),
-      login: (newToken, name) => {
-        tokenStorage.set(newToken, name)
-        setToken(newToken)
-        setUser(name ?? null)
+      ...session,
+      isAuthenticated: Boolean(session.token),
+      login: (token, user, role, username) => {
+        tokenStorage.set(token, user, role, username)
+        setSession({ token, user: user ?? null, role: role ?? null, username: username ?? null })
       },
       logout: () => {
         tokenStorage.clear()
-        setToken(null)
-        setUser(null)
+        setSession({ token: null, user: null, role: null, username: null })
       },
     }),
-    [token, user],
+    [session],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

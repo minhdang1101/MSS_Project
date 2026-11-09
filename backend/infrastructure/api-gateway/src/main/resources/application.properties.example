@@ -33,3 +33,11 @@ management.endpoints.web.exposure.include=health,info,gateway
 spring.cloud.gateway.server.webflux.routes[5].id=auth
 spring.cloud.gateway.server.webflux.routes[5].uri=lb://member-service
 spring.cloud.gateway.server.webflux.routes[5].predicates[0]=Path=/api/auth/**
+
+# A reader's own loans and fines (the gateway sets X-Member-Id from the token)
+spring.cloud.gateway.server.webflux.routes[6].id=me-loans
+spring.cloud.gateway.server.webflux.routes[6].uri=lb://loan-service
+spring.cloud.gateway.server.webflux.routes[6].predicates[0]=Path=/api/me/loans/**
+spring.cloud.gateway.server.webflux.routes[7].id=me-fines
+spring.cloud.gateway.server.webflux.routes[7].uri=lb://fine-service
+spring.cloud.gateway.server.webflux.routes[7].predicates[0]=Path=/api/me/fines/**

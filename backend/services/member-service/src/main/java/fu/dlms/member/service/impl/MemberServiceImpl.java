@@ -7,6 +7,7 @@ import fu.dlms.member.dto.MemberImportRow;
 import fu.dlms.member.dto.MemberRequest;
 import fu.dlms.member.dto.MemberResponse;
 import fu.dlms.member.entity.Member;
+import fu.dlms.member.entity.MemberRole;
 import fu.dlms.member.entity.MemberStatus;
 import fu.dlms.member.exception.DuplicateValueException;
 import fu.dlms.member.exception.ResourceNotFoundException;
@@ -48,12 +49,12 @@ public class MemberServiceImpl implements MemberService {
 
     @Override
     public List<MemberResponse> findAll() {
-        return memberRepository.findAll().stream().map(MemberResponse::from).toList();
+        return memberRepository.findAllByRole(MemberRole.MEMBER).stream().map(MemberResponse::from).toList();
     }
 
     @Override
     public MemberResponse findById(Long id) {
-        return memberRepository.findById(id)
+        return reader(id)
                 .map(MemberResponse::from)
                 .orElseThrow(() -> new ResourceNotFoundException(MEMBER, id));
     }
@@ -76,8 +77,22 @@ public class MemberServiceImpl implements MemberService {
 
     @Override
     @Transactional
+    public MemberResponse register(MemberRequest request, String password) {
+        if (memberRepository.existsByEmailIgnoreCase(request.email())) {
+            throw DuplicateValueException.email();
+        }
+        if (request.phone() != null && memberRepository.existsByPhone(request.phone())) {
+            throw DuplicateValueException.phone();
+        }
+        Member member = newMember(cardNumberGenerator.next(1).get(0), request);
+        member.setPasswordHash(passwordEncoder.encode(password));
+        return MemberResponse.from(memberRepository.save(member));
+    }
+
+    @Override
+    @Transactional
     public MemberResponse update(Long id, MemberRequest request) {
-        Member member = memberRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException(MEMBER, id));
+        Member member = reader(id).orElseThrow(() -> new ResourceNotFoundException(MEMBER, id));
         if (memberRepository.existsByEmailIgnoreCaseAndIdNot(request.email(), id)) {
             throw DuplicateValueException.email();
         }
@@ -93,7 +108,7 @@ public class MemberServiceImpl implements MemberService {
     @Override
     @Transactional
     public MemberResponse changeStatus(Long id, MemberStatus status) {
-        Member member = memberRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException(MEMBER, id));
+        Member member = reader(id).orElseThrow(() -> new ResourceNotFoundException(MEMBER, id));
         member.setStatus(status);
         return MemberResponse.from(memberRepository.save(member));
     }
@@ -148,7 +163,7 @@ public class MemberServiceImpl implements MemberService {
     @Override
     @Transactional
     public MemberResponse resetPassword(Long id) {
-        Member member = memberRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException(MEMBER, id));
+        Member member = reader(id).orElseThrow(() -> new ResourceNotFoundException(MEMBER, id));
         String password = passwordGenerator.generate();
         member.setPasswordHash(passwordEncoder.encode(password));
         return MemberResponse.from(memberRepository.save(member)).withInitialPassword(password);
@@ -183,6 +198,11 @@ public class MemberServiceImpl implements MemberService {
             default -> violation.getPropertyPath().toString();
         };
         return field + ": " + violation.getMessage();
+    }
+
+    /** Only readers are managed on the Members screen: a librarian's account is never touched from it. */
+    private java.util.Optional<Member> reader(Long id) {
+        return memberRepository.findById(id).filter(m -> m.getRole() == MemberRole.MEMBER);
     }
 
     private Member newMember(String cardNo, MemberRequest request) {

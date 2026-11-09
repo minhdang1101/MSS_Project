@@ -17,6 +17,9 @@ public interface MemberService {
     /** Issues a card and a login password; the answer carries that password, once ({@code initialPassword}). */
     MemberResponse create(MemberRequest request);
 
+    /** A reader signing up: the card is issued automatically and the password is the one they chose. */
+    MemberResponse register(MemberRequest request, String password);
+
     MemberResponse update(Long id, MemberRequest request);
 
     MemberResponse changeStatus(Long id, MemberStatus status);

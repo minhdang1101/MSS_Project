@@ -62,6 +62,30 @@ class MemberServiceImplTest {
         return m;
     }
 
+    // ---------- librarians are not managed here ----------
+
+    @Test
+    void theMembersScreenListsReadersOnly() {
+        when(repository.findAllByRole(fu.dlms.member.entity.MemberRole.MEMBER)).thenReturn(List.of(member(1, "TV-0001", "a@x.com")));
+
+        assertThat(service.findAll()).hasSize(1);
+        org.mockito.Mockito.verify(repository, org.mockito.Mockito.never()).findAll();
+    }
+
+    @Test
+    void aLibrarianCannotBeSuspendedOrReadThroughTheMembersApi() {
+        Member librarian = member(9, "TT-0001", "tt@library.local");
+        librarian.setRole(fu.dlms.member.entity.MemberRole.LIBRARIAN);
+        when(repository.findById(9L)).thenReturn(java.util.Optional.of(librarian));
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.changeStatus(9L, fu.dlms.member.entity.MemberStatus.LOCKED))
+                .isInstanceOf(fu.dlms.member.exception.ResourceNotFoundException.class);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.resetPassword(9L))
+                .isInstanceOf(fu.dlms.member.exception.ResourceNotFoundException.class);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.findById(9L))
+                .isInstanceOf(fu.dlms.member.exception.ResourceNotFoundException.class);
+    }
+
     // ---------- create ----------
 
     @Test
