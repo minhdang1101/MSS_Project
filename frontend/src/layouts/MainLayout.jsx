@@ -1,5 +1,6 @@
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
+import LibrarianBell from '../pages/notifications/LibrarianBell.jsx'
 
 const NAV_ITEMS = [
   { to: '/', label: 'Hôm nay', end: true },
@@ -36,8 +37,11 @@ export default function MainLayout() {
           <button className="logout" type="button" onClick={handleLogout}>Đăng xuất</button>
         </div>
       </aside>
-      <main key={pathname} className="page-in">
-        <Outlet />
+      <main>
+        <div className="bell-dock"><LibrarianBell /></div>
+        <div key={pathname} className="page-in">
+          <Outlet />
+        </div>
       </main>
     </div>
   )
