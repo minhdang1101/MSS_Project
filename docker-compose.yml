@@ -1,6 +1,47 @@
-# Local infrastructure (PostgreSQL, RabbitMQ, Eureka registry). Business services run from the IDE.
-# Credentials come from .env (git-ignored) - copy .env.example first.
+# Digital Library Management System - Docker Compose
+# Credentials come from .env (git-ignored) - copy .env.example to .env first.
+#
+# Two ways to run:
+#   docker compose up -d                       -> infrastructure only (PostgreSQL, RabbitMQ, Eureka, Mailpit);
+#                                                 business services run from the IDE as before
+#   docker compose --profile app up -d --build -> the whole system in containers (adds the 5 services + API Gateway)
+#
+# Inside the Docker network containers reach each other by SERVICE NAME (postgres:5432, rabbitmq:5672,
+# eureka-server:8761), never "localhost": in a container, localhost is that container itself.
+# Only the API Gateway (8080) is published for the frontend; ports 8081-8085 stay private, because the services trust
+# the gateway to have checked the JWT.
+
+# ---------- Settings shared by every Spring Boot service container (YAML anchors, merged with <<:) ----------
+x-spring-service: &spring-service
+  restart: on-failure
+  networks: [dlms]
+
+x-common-env: &common-env
+  # -D keeps the exact property name: an env var would turn "defaultZone" into "defaultzone" and Eureka ignores it.
+  # Small heap per service so 7 JVMs fit on a laptop.
+  JAVA_TOOL_OPTIONS: >-
+    -Xmx384m -XX:+UseSerialGC
+    -Deureka.client.service-url.defaultZone=http://eureka-server:8761/eureka/
+  # Faster discovery than the 30s defaults, so the gateway finds a freshly started service sooner
+  EUREKA_CLIENT_REGISTRYFETCHINTERVALSECONDS: 5
+  EUREKA_INSTANCE_LEASERENEWALINTERVALINSECONDS: 10
+  SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+  SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+  SPRING_RABBITMQ_HOST: rabbitmq
+  SPRING_RABBITMQ_PORT: 5672
+  SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USER}
+  SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+
+x-depends-on-infra: &depends-on-infra
+  postgres:
+    condition: service_healthy
+  rabbitmq:
+    condition: service_healthy
+  eureka-server:
+    condition: service_healthy
+
 services:
+  # =========================== Infrastructure ===========================
   postgres:
     image: postgres:16-alpine
     container_name: dlms-postgres
@@ -8,16 +49,20 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
-      - "5432:5432"
+      # Host port is configurable: set POSTGRES_PORT=5433 in .env if PostgreSQL is already installed on the machine
+      - "${POSTGRES_PORT:-5432}:5432"
     # Runs 00-create-databases, 01-schema, 02-seed in order - only when the volume is empty
     volumes:
       - ./docker/postgres:/docker-entrypoint-initdb.d:ro
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d postgres"]
+      # -h 127.0.0.1 (TCP): while the init scripts run, PostgreSQL only listens on its unix socket,
+      # so this stays "not ready" until the databases exist
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U $${POSTGRES_USER} -d postgres"]
       interval: 5s
       timeout: 3s
       retries: 10
+    networks: [dlms]
 
   rabbitmq:
     image: rabbitmq:3.13-management-alpine
@@ -26,11 +71,20 @@ services:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
     ports:
-      - "5672:5672"
-      - "15672:15672"
+      - "5672:5672"     # AMQP (services started from the IDE)
+      - "15672:15672"   # Management UI: http://localhost:15672
+    # Comes back by itself after Docker Desktop restarts (it used to stay stopped)
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks: [dlms]
 
   # Service registry. Services started from the IDE register at http://localhost:8761/eureka/;
-  # services in containers use EUREKA_URL=http://eureka-server:8761/eureka/ and depends_on: eureka-server (healthy).
+  # services in containers use http://eureka-server:8761/eureka/ (see JAVA_TOOL_OPTIONS above).
   eureka-server:
     build:
       context: ./backend
@@ -38,7 +92,127 @@ services:
     image: dlms/eureka-server
     container_name: dlms-eureka
     ports:
-      - "8761:8761"
+      - "8761:8761"     # Dashboard: http://localhost:8761
+    networks: [dlms]
+
+  # Fake mail server for notification-service: catches every email, shows it at http://localhost:8025.
+  # Nothing is ever delivered to a real mailbox.
+  mailpit:
+    image: axllent/mailpit:v1.21
+    container_name: dlms-mailpit
+    ports:
+      - "8025:8025"     # Web UI
+      - "1025:1025"     # SMTP (notification-service started from the IDE can use localhost:1025)
+    networks: [dlms]
+
+  # =========================== Business services (profile "app") ===========================
+  book-catalog-service:
+    <<: *spring-service
+    profiles: [app]
+    build:
+      context: ./backend
+      dockerfile: services/book-catalog-service/Dockerfile
+    image: dlms/book-catalog-service
+    container_name: dlms-book-catalog
+    environment:
+      <<: *common-env
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/catalog_db
+    depends_on: *depends-on-infra
+
+  member-service:
+    <<: *spring-service
+    profiles: [app]
+    build:
+      context: ./backend
+      dockerfile: services/member-service/Dockerfile
+    image: dlms/member-service
+    container_name: dlms-member
+    environment:
+      <<: *common-env
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/member_db
+      # Must be the same value as the gateway's, or the gateway rejects every token
+      APP_SECURITY_JWT_SECRET: ${JWT_SECRET}
+      # First librarian (TT-0001) is created with this password when the librarian table is empty
+      APP_BOOTSTRAP_LIBRARIAN_PASSWORD: ${LIBRARIAN_PASSWORD}
+    depends_on: *depends-on-infra
+
+  loan-service:
+    <<: *spring-service
+    profiles: [app]
+    build:
+      context: ./backend
+      dockerfile: services/loan-service/Dockerfile
+    image: dlms/loan-service
+    container_name: dlms-loan
+    environment:
+      <<: *common-env
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/loan_db
+      # 08:00 every day by default; .env can set e.g. "0 */2 * * * *" (every 2 minutes) for a demo
+      APP_LOAN_DUESCANCRON: ${LOAN_DUE_SCAN_CRON:-0 0 8 * * *}
+    depends_on: *depends-on-infra
+
+  fine-service:
+    <<: *spring-service
+    profiles: [app]
+    build:
+      context: ./backend
+      dockerfile: services/fine-service/Dockerfile
+    image: dlms/fine-service
+    container_name: dlms-fine
+    environment:
+      <<: *common-env
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/fine_db
+    depends_on: *depends-on-infra
+
+  notification-service:
+    <<: *spring-service
+    profiles: [app]
+    build:
+      context: ./backend
+      dockerfile: services/notification-service/Dockerfile
+    image: dlms/notification-service
+    container_name: dlms-notification
+    environment:
+      <<: *common-env
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/notification_db
+      # Real SMTP to Mailpit instead of log-only emails
+      APP_NOTIFICATION_MAIL_ENABLED: "true"
+      APP_NOTIFICATION_MAIL_FROM: thuvien@dlms.local
+      SPRING_MAIL_HOST: mailpit
+      SPRING_MAIL_PORT: 1025
+      APP_NOTIFICATION_DISPATCHINTERVALMS: ${NOTIFICATION_DISPATCH_INTERVAL_MS:-15000}
+    depends_on:
+      <<: *depends-on-infra
+      mailpit:
+        condition: service_started
+
+  # =========================== API Gateway (profile "app") ===========================
+  api-gateway:
+    <<: *spring-service
+    profiles: [app]
+    build:
+      context: ./backend
+      dockerfile: infrastructure/api-gateway/Dockerfile
+    image: dlms/api-gateway
+    container_name: dlms-gateway
+    environment:
+      JAVA_TOOL_OPTIONS: >-
+        -Xmx384m -XX:+UseSerialGC
+        -Deureka.client.service-url.defaultZone=http://eureka-server:8761/eureka/
+      EUREKA_CLIENT_REGISTRYFETCHINTERVALSECONDS: 5
+      APP_SECURITY_JWT_SECRET: ${JWT_SECRET}
+      APP_SECURITY_ENABLED: "true"
+      # The React dev server (npm run dev) still runs on the host
+      APP_CORS_ALLOWEDORIGINS: http://localhost:5173
+    ports:
+      - "8080:8080"     # the only API port the browser uses
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+
+networks:
+  dlms:
+    name: dlms-network
 
 volumes:
   postgres-data:
