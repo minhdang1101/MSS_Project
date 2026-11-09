@@ -13,6 +13,7 @@
 --   book         + category, language; new table book_cover (cover pictures)
 --   member       + password_hash (reader login)
 --   notification + read_at (reader marks a notification as read)
+--                + source_event_id, attempts, last_error, created_at, updated_at (sending and retries)
 
 -- ===================== catalog_db =====================
 \connect catalog_db
@@ -94,4 +95,9 @@ CREATE TABLE IF NOT EXISTS closed_day (
 \connect notification_db
 
 ALTER TABLE notification ADD COLUMN IF NOT EXISTS read_at timestamp(6) with time zone;
+ALTER TABLE notification ADD COLUMN IF NOT EXISTS source_event_id varchar(36);
+ALTER TABLE notification ADD COLUMN IF NOT EXISTS attempts integer NOT NULL DEFAULT 0;
+ALTER TABLE notification ADD COLUMN IF NOT EXISTS last_error varchar(500);
+ALTER TABLE notification ADD COLUMN IF NOT EXISTS created_at timestamp(6) with time zone NOT NULL DEFAULT now();
+ALTER TABLE notification ADD COLUMN IF NOT EXISTS updated_at timestamp(6) with time zone NOT NULL DEFAULT now();
 CREATE INDEX IF NOT EXISTS idx_notification_member_scheduled ON notification (member_id, scheduled_at DESC);

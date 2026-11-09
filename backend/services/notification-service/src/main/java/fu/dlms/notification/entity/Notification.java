@@ -16,22 +16,28 @@ import lombok.Setter;
 import java.time.Instant;
 
 /**
- * One reminder for one loan. Created PENDING by the RabbitMQ consumer, then sent by NotificationDispatcher.
- * created_at / updated_at come from BaseEntity.
+ * Một thông báo nhắc hạn cho một lượt mượn.
+ *
+ * <p>Vòng đời: LoanEventListener tạo ở trạng thái PENDING → NotificationDispatcher gửi → SENT, hoặc FAILED sau
+ * {@link #MAX_ATTEMPTS} lần gửi lỗi. created_at / updated_at được kế thừa từ BaseEntity.
+ *
+ * <p>Cấu trúc bảng phải khớp với docker/postgres/01-schema.sql (script tạo database khi chạy Docker).
  */
 @Getter
 @Setter
 @NoArgsConstructor
 @Entity
 @Table(name = "notification", indexes = {
-        // NotificationDispatcher looks up "PENDING and due" rows every minute
-        @Index(name = "idx_notification_status_scheduled", columnList = "status, scheduled_at"),
-        // GET /api/notifications?memberId=...
-        @Index(name = "idx_notification_member", columnList = "member_id")
+        // Cùng tên với 01-schema.sql. Ở đó idx_notification_pending là partial index (WHERE status = 'PENDING');
+        // Hibernate không tạo được partial index nên khi Hibernate tự tạo bảng thì đây là index thường.
+        // Dùng cho NotificationDispatcher: tìm các thông báo PENDING đã đến giờ gửi.
+        @Index(name = "idx_notification_pending", columnList = "scheduled_at"),
+        // Danh sách thông báo của một độc giả, mới nhất trước.
+        @Index(name = "idx_notification_member_scheduled", columnList = "member_id, scheduled_at DESC")
 })
 public class Notification extends BaseEntity {
 
-    /** A reminder is retried at most this many times before it is marked FAILED. */
+    /** Số lần gửi tối đa; gửi lỗi đủ số lần này thì chuyển sang FAILED. */
     public static final int MAX_ATTEMPTS = 3;
 
     @Id
@@ -39,14 +45,13 @@ public class Notification extends BaseEntity {
     private Long id;
 
     /**
-     * "{type}:{loanId}", e.g. "DUE_SOON:15". UNIQUE, so one loan gets at most one reminder of each type,
-     * even if the same event is delivered twice or loan-service emits it again the next day.
-     * Built by {@link NotificationType#idempotencyKey(Long)}.
+     * Khóa chống trùng dạng "{loại}:{loanId}", vd "DUE_SOON:15". Cột UNIQUE nên mỗi lượt mượn có tối đa một thông báo
+     * mỗi loại, kể cả khi cùng một sự kiện được giao nhiều lần. Tạo bằng {@link NotificationType#idempotencyKey(Long)}.
      */
     @Column(name = "idempotency_key", nullable = false, unique = true, length = 100)
     private String idempotencyKey;
 
-    /** eventId of the LoanEvent that created this row. Only for tracing; not used for duplicate checks. */
+    /** eventId của sự kiện đã tạo ra dòng này. Chỉ để truy vết, không dùng để kiểm tra trùng. */
     @Column(name = "source_event_id", length = 36)
     private String sourceEventId;
 
@@ -60,10 +65,12 @@ public class Notification extends BaseEntity {
     @Column(nullable = false, length = 20)
     private NotificationType type;
 
+    /** EMAIL nếu độc giả có email, ngược lại IN_APP (xem RecipientResolver). */
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private NotificationChannel channel;
 
+    /** Địa chỉ email, hoặc "member:{id}" với kênh IN_APP. */
     @Column(nullable = false, length = 150)
     private String recipient;
 
@@ -73,7 +80,7 @@ public class Notification extends BaseEntity {
     @Column(nullable = false, columnDefinition = "TEXT")
     private String message;
 
-    /** Earliest time the dispatcher may send it. */
+    /** Thời điểm sớm nhất được phép gửi. Gửi lỗi thì được dời ra sau để thử lại. */
     @Column(name = "scheduled_at", nullable = false)
     private Instant scheduledAt;
 
@@ -84,11 +91,15 @@ public class Notification extends BaseEntity {
     @Column(nullable = false, length = 20)
     private NotificationStatus status = NotificationStatus.PENDING;
 
-    /** How many times sending has been tried. */
+    /** Số lần đã thử gửi. */
     @Column(nullable = false)
     private int attempts = 0;
 
-    /** Reason of the last failed send, shown when checking FAILED reminders. */
+    /** Lý do của lần gửi lỗi gần nhất, để thủ thư xem khi thông báo bị FAILED. */
     @Column(name = "last_error", length = 500)
     private String lastError;
+
+    /** Lúc độc giả mở thông báo trong ứng dụng; null nghĩa là chưa đọc. */
+    @Column(name = "read_at")
+    private Instant readAt;
 }

@@ -191,7 +191,14 @@ CREATE TABLE IF NOT EXISTS notification (
     sent_at         timestamp(6) with time zone,
     status          varchar(20)  NOT NULL CHECK (status IN ('PENDING', 'SENT', 'FAILED')),
     -- when the reader opened it in the app; NULL while unread
-    read_at         timestamp(6) with time zone
+    read_at         timestamp(6) with time zone,
+    -- eventId of the LoanEvent that created the row (tracing only; duplicates are blocked by idempotency_key)
+    source_event_id varchar(36),
+    -- send attempts so far; FAILED after 3 (NotificationDelivery), last_error keeps the reason
+    attempts        integer      NOT NULL DEFAULT 0,
+    last_error      varchar(500),
+    created_at      timestamp(6) with time zone NOT NULL DEFAULT now(),
+    updated_at      timestamp(6) with time zone NOT NULL DEFAULT now()
 );
 -- A reader's list: their notifications, newest first
 CREATE INDEX IF NOT EXISTS idx_notification_member_scheduled ON notification (member_id, scheduled_at DESC);
