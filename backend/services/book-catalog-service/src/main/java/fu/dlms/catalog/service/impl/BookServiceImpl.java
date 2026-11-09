@@ -61,6 +61,7 @@ public class BookServiceImpl implements BookService {
         if (bookRepository.existsByIsbn(isbn)) {
             throw new BusinessException("ISBN " + isbn + " đã có trong danh mục.");
         }
+
         Book book = new Book();
         book.setIsbn(isbn);
         book.setTitle(request.title().trim());
@@ -70,6 +71,7 @@ public class BookServiceImpl implements BookService {
         book.setFormat(request.format());
         book.setTotalCopies(request.totalCopies());
         book.setAvailableCopies(request.totalCopies());
+        book.refreshStatus();
         Book saved = bookRepository.save(book);
 
         // A printed book needs one row per copy, or nothing could ever be lent out.
@@ -124,6 +126,19 @@ public class BookServiceImpl implements BookService {
         return new CoverImage(cover.getContentType(), cover.getData());
     }
 
+    private static void rejectFutureYear(BookRequest request) {
+        if (request.publicationYear() != null && request.publicationYear() > Year.now().getValue()) {
+            throw new FieldValidationException("publicationYear", "Năm xuất bản không được ở tương lai");
+        }
+    }
+
+    private List<BookResponse> enrich(List<Book> books) {
+        Map<Long, Instant> covers = new HashMap<>();
+        coverRepository.findAllStamps().forEach(s -> covers.put(s.getBookId(), s.getUpdatedAt()));
+        Map<Long, String> shelves = shelvesByBook();
+        return books.stream().map(b -> BookResponse.from(b, covers.get(b.getId()), shelves.get(b.getId()))).toList();
+    }
+
     private Map<Long, String> shelvesByBook() {
         Map<Long, String> shelves = new HashMap<>();
         copyRepository.findShelves().forEach(s -> shelves.merge(s.getBookId(), s.getShelf(), (a, b) -> a + ", " + b));
@@ -148,5 +163,68 @@ public class BookServiceImpl implements BookService {
             return "image/png";
         }
         return null;
+    }
+
+    @Override
+    public List<BookResponse> search(String keyword) {
+
+        if(keyword == null || keyword.isBlank()){
+            keyword = "%";
+        }else{
+            keyword = "%" + keyword.trim().toLowerCase() +"%";
+        }
+        List<BookResponse> bookResponseList = bookRepository.search(keyword).stream().map(c -> BookResponse.from(c)).toList();
+
+
+        return bookResponseList;
+    }
+
+    @Override
+    @Transactional
+    public BookResponse update(Long id, BookRequest request) {
+
+        Book book = bookRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Book",id));
+
+        if(!book.getFormat().equals(request.format())){
+            throw new BusinessException("Book can not change between digital and physical !");
+        }
+
+        if(!book.getIsbn().equals(request.isbn()) && bookRepository.existsByIsbn(request.isbn())){
+            throw new BusinessException("ISBNS Exist !");
+        }
+
+        book.setIsbn(request.isbn());
+        book.setTitle(request.title());
+        book.setAuthor(request.author());
+        book.setPublisher(request.publisher());
+        book.setPublicationYear(request.publicationYear());
+
+        if(book.getFormat() == BookFormat.DIGITAL){
+            int borrowed = book.getTotalCopies() - book.getAvailableCopies();
+            if(request.totalCopies() < borrowed){
+                throw new BusinessException("total copies must larger than the borrowed digital book");
+            }else{
+                book.setTotalCopies(request.totalCopies());
+                book.setAvailableCopies(request.totalCopies() - borrowed);
+            }
+        }
+
+        book.refreshStatus();
+
+        return BookResponse.from(book);
+    }
+
+    @Override
+    @Transactional
+    public void delete(Long id) {
+        Book book = bookRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("book",id));
+        if(book.getStatus() == BookStatus.ARCHIVED){
+            return;
+        }
+        if(book.getAvailableCopies() < book.getTotalCopies()){
+            throw new BusinessException("Cannot archive book: some copies are on loan");
+        }
+        book.setStatus(BookStatus.ARCHIVED);
     }
 }

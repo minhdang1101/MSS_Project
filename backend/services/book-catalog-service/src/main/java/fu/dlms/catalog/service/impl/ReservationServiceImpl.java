@@ -47,7 +47,7 @@ public class ReservationServiceImpl implements ReservationService {
             return ReservationResponse.from(existing.get()); // a retry gets the same hold, never a second copy
         }
         Book book = bookRepository.findById(bookId).orElseThrow(() -> new ResourceNotFoundException("Book", bookId));
-        if (book.getStatus() != BookStatus.AVAILABLE) {
+        if (book.getStatus() == BookStatus.ARCHIVED) {
             throw new BusinessException("Sách \"" + book.getTitle() + "\" hiện không được phép cho mượn.");
         }
         if (book.getAvailableCopies() <= 0) {
@@ -61,6 +61,7 @@ public class ReservationServiceImpl implements ReservationService {
             copy.setStatus(CopyStatus.ON_LOAN);
         }
         book.setAvailableCopies(book.getAvailableCopies() - 1); // @Version: a concurrent borrow loses here, see the 409 handler
+        book.refreshStatus();
 
         Reservation reservation = new Reservation();
         reservation.setBook(book);
@@ -106,5 +107,6 @@ public class ReservationServiceImpl implements ReservationService {
             copy.setStatus(CopyStatus.AVAILABLE);
         }
         book.setAvailableCopies(Math.min(book.getTotalCopies(), book.getAvailableCopies() + 1));
+        book.refreshStatus();
     }
 }

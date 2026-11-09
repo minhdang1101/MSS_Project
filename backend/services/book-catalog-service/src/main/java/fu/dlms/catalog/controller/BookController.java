@@ -6,13 +6,8 @@ import fu.dlms.catalog.service.BookService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.ResponseStatus;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
@@ -28,6 +23,12 @@ public class BookController {
         return bookService.findAll();
     }
 
+    @GetMapping("/search")
+    public ResponseEntity<List<BookResponse>> search(@RequestParam(required = false) String keyword) {
+        return ResponseEntity.status(HttpStatus.OK).body(bookService.search(keyword));
+    }
+
+
     @GetMapping("/{id}")
     public BookResponse findById(@PathVariable Long id) {
         return bookService.findById(id);
@@ -39,6 +40,16 @@ public class BookController {
         return bookService.create(request);
     }
 
-    // TODO: PUT /{id}, DELETE /{id}
+    @PutMapping("/{id}")
+    public ResponseEntity<BookResponse> update(@PathVariable Long id, @Valid @RequestBody BookRequest request){
+        return ResponseEntity.status(HttpStatus.OK).body(bookService.update(id, request));
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> delete(@PathVariable Long id){
+        bookService.delete(id);
+        return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
+    }
+
     // TODO: POST /{id}/reservations  - called by loan-service to check & reserve availability
 }

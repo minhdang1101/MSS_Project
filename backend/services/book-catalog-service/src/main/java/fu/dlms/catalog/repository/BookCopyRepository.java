@@ -18,6 +18,10 @@ public interface BookCopyRepository extends JpaRepository<BookCopy, Long> {
 
     List<BookCopy> findByBookId(Long bookId);
 
+    boolean existsByBarcode(String barcode);
+
+    Optional<BookCopy> findByBarcode(String barcode);
+
     Optional<BookCopy> findFirstByBookIdAndStatus(Long bookId, CopyStatus status);
 
     /** Each book's shelf locations (one row per distinct shelf), for showing "where is it" in the list. */

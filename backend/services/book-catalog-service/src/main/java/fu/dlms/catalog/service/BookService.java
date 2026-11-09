@@ -14,6 +14,14 @@ public interface BookService {
 
     BookResponse create(BookRequest request);
 
+    /** Books whose title, author or ISBN contains the keyword (archived ones are left out). */
+    List<BookResponse> search(String keyword);
+
+    BookResponse update(Long id, BookRequest request);
+
+    /** Archives the book; refused while some copy is on loan. */
+    void delete(Long id);
+
     /** Stores (or replaces) the cover picture; JPG or PNG up to 1MB. Returns the book with its new coverUrl. */
     BookResponse saveCover(Long id, MultipartFile file);
 

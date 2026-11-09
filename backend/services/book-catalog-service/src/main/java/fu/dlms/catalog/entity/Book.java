@@ -52,6 +52,19 @@ public class Book extends BaseEntity {
     @Column(nullable = false, length = 20)
     private BookStatus status = BookStatus.AVAILABLE;
 
+    public void refreshStatus() {
+
+        if( this.getStatus() == BookStatus.ARCHIVED){
+            return;
+        }
+
+        if(this.getAvailableCopies() == 0){
+            this.setStatus(BookStatus.UNAVAILABLE);
+        }else if(this.getAvailableCopies() > 0){
+            this.setStatus(BookStatus.AVAILABLE);
+        }
+    }
+
     /** Optimistic lock: protects available_copies from concurrent borrow/return updates. */
     @Version
     private Long version;
