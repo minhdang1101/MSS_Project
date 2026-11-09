@@ -6,6 +6,7 @@ import fu.dlms.catalog.entity.Book;
 import fu.dlms.catalog.entity.BookCopy;
 import fu.dlms.catalog.entity.BookCover;
 import fu.dlms.catalog.entity.BookFormat;
+import fu.dlms.catalog.entity.BookStatus;
 import fu.dlms.catalog.exception.BusinessException;
 import fu.dlms.catalog.exception.FieldValidationException;
 import fu.dlms.catalog.exception.InvalidImageException;
