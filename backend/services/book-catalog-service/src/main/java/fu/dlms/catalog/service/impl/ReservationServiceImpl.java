@@ -93,6 +93,9 @@ public class ReservationServiceImpl implements ReservationService {
                     r.setStatus(ReservationStatus.RELEASED);
                     log.info("Reservation {} released", requestKey);
                 });
+
+        reservationRepository.findByRequestKey(requestKey);
+
     }
 
     @Override
@@ -116,7 +119,7 @@ public class ReservationServiceImpl implements ReservationService {
         if (copy != null) {
             copy.setStatus(CopyStatus.AVAILABLE);
         }
-        book.setAvailableCopies(Math.min(book.getTotalCopies(), book.getAvailableCopies() + 1));
+        book.setAvailableCopies(book.getAvailableCopies() + 1);
         book.refreshStatus();
     }
 }

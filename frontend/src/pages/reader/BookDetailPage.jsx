@@ -30,7 +30,6 @@ function Detail({ book }) {
     ['Nhà xuất bản', book.publisher ?? '—'],
     ['Năm xuất bản', book.publicationYear ?? '—'],
     ['Định dạng', digital ? 'Sách điện tử' : 'Sách in'],
-    ...(digital ? [] : [['Vị trí kệ', book.shelfLocation ?? '—']]),
     [digital ? 'Giấy phép còn lại' : 'Số bản còn trên kệ', `${book.availableCopies} / ${book.totalCopies}`],
   ]
 

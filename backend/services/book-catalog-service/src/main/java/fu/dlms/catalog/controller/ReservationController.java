@@ -28,7 +28,6 @@ public class ReservationController {
     }
 
     @PostMapping("/reservations/{requestKey}/release")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
     public ResponseEntity<Void> release(@PathVariable String requestKey) {
         reservationService.release(requestKey);
         return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
