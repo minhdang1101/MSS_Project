@@ -65,11 +65,6 @@ public class SecurityConfig {
                                                          ReactiveJwtDecoder jwtDecoder) {
         http.csrf(ServerHttpSecurity.CsrfSpec::disable)
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()));
-
-        if (!securityEnabled) {
-            return http.authorizeExchange(ex -> ex.anyExchange().permitAll()).build();
-        }
-
         return http
                 // Thứ tự quan trọng: Spring dùng quy tắc ĐẦU TIÊN khớp với request
                 .authorizeExchange(ex -> ex

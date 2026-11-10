@@ -1,0 +1,305 @@
+{
+  "realm": "library",
+  "displayName": "Thư viện",
+  "enabled": true,
+  "sslRequired": "none",
+  "registrationAllowed": false,
+  "resetPasswordAllowed": true,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "verifyEmail": false,
+  "editUsernameAllowed": false,
+  "rememberMe": false,
+  "internationalizationEnabled": true,
+  "supportedLocales": [
+    "vi",
+    "en"
+  ],
+  "defaultLocale": "vi",
+  "accessTokenLifespan": 1800,
+  "ssoSessionIdleTimeout": 28800,
+  "ssoSessionMaxLifespan": 36000,
+  "bruteForceProtected": true,
+  "failureFactor": 5,
+  "waitIncrementSeconds": 300,
+  "maxFailureWaitSeconds": 300,
+  "permanentLockout": false,
+  "smtpServer": {
+    "host": "mailpit",
+    "port": "1025",
+    "from": "thuvien@dlms.local",
+    "fromDisplayName": "Thư viện",
+    "auth": "false",
+    "ssl": "false",
+    "starttls": "false"
+  },
+  "roles": {
+    "realm": [
+      {
+        "name": "LIBRARIAN",
+        "description": "Thủ thư: quản lý toàn bộ hệ thống"
+      },
+      {
+        "name": "MEMBER",
+        "description": "Bạn đọc: chỉ xem dữ liệu của chính mình"
+      }
+    ]
+  },
+  "components": {
+    "org.keycloak.userprofile.UserProfileProvider": [
+      {
+        "providerId": "declarative-user-profile",
+        "subComponents": {},
+        "config": {
+          "kc.user.profile.config": [
+            "{\"attributes\":[{\"name\":\"username\",\"displayName\":\"${username}\",\"validations\":{\"length\":{\"min\":3,\"max\":255},\"username-prohibited-characters\":{}},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\"]}},{\"name\":\"email\",\"displayName\":\"${email}\",\"validations\":{\"email\":{},\"length\":{\"max\":255}},\"required\":{\"roles\":[\"user\"]},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]}},{\"name\":\"firstName\",\"displayName\":\"${firstName}\",\"validations\":{\"length\":{\"max\":255}},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]}},{\"name\":\"lastName\",\"displayName\":\"${lastName}\",\"validations\":{\"length\":{\"max\":255}},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]}},{\"name\":\"mid\",\"displayName\":\"Mã thành viên\",\"permissions\":{\"view\":[\"admin\"],\"edit\":[\"admin\"]}}]}"
+          ]
+        }
+      }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "library-web",
+      "name": "Giao diện web thư viện",
+      "enabled": true,
+      "publicClient": true,
+      "protocol": "openid-connect",
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "implicitFlowEnabled": false,
+      "serviceAccountsEnabled": false,
+      "rootUrl": "http://localhost:5173",
+      "baseUrl": "/",
+      "redirectUris": [
+        "http://localhost:5173/*"
+      ],
+      "webOrigins": [
+        "http://localhost:5173"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://localhost:5173/*"
+      },
+      "defaultClientScopes": [
+        "web-origins",
+        "acr",
+        "profile",
+        "roles",
+        "email"
+      ],
+      "optionalClientScopes": [
+        "offline_access"
+      ],
+      "protocolMappers": [
+        {
+          "name": "mid",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "mid",
+            "claim.name": "mid",
+            "jsonType.label": "long",
+            "access.token.claim": "true",
+            "id.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "library-demo",
+      "name": "Chỉ để demo backend bằng curl/Postman (lấy token bằng mật khẩu). Không dùng khi chạy thật.",
+      "enabled": true,
+      "publicClient": true,
+      "protocol": "openid-connect",
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "defaultClientScopes": [
+        "web-origins",
+        "acr",
+        "profile",
+        "roles",
+        "email"
+      ],
+      "protocolMappers": [
+        {
+          "name": "mid",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "mid",
+            "claim.name": "mid",
+            "jsonType.label": "long",
+            "access.token.claim": "true",
+            "id.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "member-service",
+      "name": "Member service (tạo tài khoản qua Admin API)",
+      "enabled": true,
+      "publicClient": false,
+      "secret": "member-service-dev-secret",
+      "protocol": "openid-connect",
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true
+    }
+  ],
+  "users": [
+    {
+      "username": "service-account-member-service",
+      "enabled": true,
+      "serviceAccountClientId": "member-service",
+      "clientRoles": {
+        "realm-management": [
+          "manage-users",
+          "view-users",
+          "query-users",
+          "view-realm"
+        ]
+      }
+    },
+    {
+      "username": "TT-0001",
+      "enabled": true,
+      "email": "tt-0001@library.local",
+      "emailVerified": true,
+      "firstName": "Thủ thư mặc định",
+      "lastName": "",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Admin@12345",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "LIBRARIAN"
+      ]
+    },
+    {
+      "username": "TV-0412",
+      "enabled": true,
+      "email": "khoi.pham@example.com",
+      "emailVerified": true,
+      "firstName": "Phạm Minh Khôi",
+      "lastName": "",
+      "attributes": {
+        "mid": [
+          "1"
+        ]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Reader@12345",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "MEMBER"
+      ]
+    },
+    {
+      "username": "TV-0087",
+      "enabled": true,
+      "email": "an.le@example.com",
+      "emailVerified": true,
+      "firstName": "Lê Hoài An",
+      "lastName": "",
+      "attributes": {
+        "mid": [
+          "2"
+        ]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Reader@12345",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "MEMBER"
+      ]
+    },
+    {
+      "username": "TV-1130",
+      "enabled": true,
+      "email": "ngoc.do@example.com",
+      "emailVerified": true,
+      "firstName": "Đỗ Bảo Ngọc",
+      "lastName": "",
+      "attributes": {
+        "mid": [
+          "3"
+        ]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Reader@12345",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "MEMBER"
+      ]
+    },
+    {
+      "username": "TV-0256",
+      "enabled": true,
+      "email": "viet.tran@example.com",
+      "emailVerified": true,
+      "firstName": "Trần Quốc Việt",
+      "lastName": "",
+      "attributes": {
+        "mid": [
+          "4"
+        ]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Reader@12345",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "MEMBER"
+      ]
+    },
+    {
+      "username": "TV-0901",
+      "enabled": true,
+      "email": "ha.vu@example.com",
+      "emailVerified": true,
+      "firstName": "Vũ Thanh Hà",
+      "lastName": "",
+      "attributes": {
+        "mid": [
+          "5"
+        ]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Reader@12345",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "MEMBER"
+      ]
+    }
+  ],
+  "passwordPolicy": "length(8)"
+}
