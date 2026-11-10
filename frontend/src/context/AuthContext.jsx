@@ -1,40 +1,51 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
-import { UNAUTHORIZED_EVENT } from '../api/axiosClient.js'
-import { tokenStorage } from '../utils/storage.js'
+import keycloak, { identityOf, startKeycloak } from '../auth/keycloak.js'
 
 const AuthContext = createContext(null)
 
-export function AuthProvider({ children }) {
-  const [session, setSession] = useState({
-    token: tokenStorage.get(),
-    user: tokenStorage.getUser(),
-    role: tokenStorage.getRole(),
-    username: tokenStorage.getUsername(),
-  })
+const SIGNED_OUT = { ready: true, authenticated: false, user: null, username: null, role: null }
 
-  // The gateway rejected our token (expired / invalid): drop the session so RequireAuth redirects to /login.
+const readSession = () => ({ ready: true, authenticated: Boolean(keycloak.authenticated), ...identityOf(keycloak) })
+
+/**
+ * Sign-in is Keycloak's page: login() sends the user there and brings them back signed in. This context only reflects
+ * what the token says (name, card number or staff code, role) and offers login, logout and the account page.
+ */
+export function AuthProvider({ children }) {
+  const [session, setSession] = useState({ ...SIGNED_OUT, ready: false })
+  const [failed, setFailed] = useState(null)
+
   useEffect(() => {
-    const onUnauthorized = () => setSession({ token: null, user: null, role: null, username: null })
-    window.addEventListener(UNAUTHORIZED_EVENT, onUnauthorized)
-    return () => window.removeEventListener(UNAUTHORIZED_EVENT, onUnauthorized)
+    let current = true
+    startKeycloak()
+      .then(() => current && setSession(readSession()))
+      .catch(() => current && setFailed('Không kết nối được máy chủ đăng nhập (Keycloak). Kiểm tra Keycloak đã chạy chưa rồi tải lại trang.'))
+    // The token was renewed or could not be: keep the session in step
+    keycloak.onAuthRefreshSuccess = () => setSession(readSession())
+    keycloak.onAuthLogout = () => setSession(SIGNED_OUT)
+    keycloak.onTokenExpired = () => {
+      keycloak.updateToken(30).catch(() => setSession(SIGNED_OUT))
+    }
+    return () => {
+      current = false
+    }
   }, [])
 
   const value = useMemo(
     () => ({
       ...session,
-      isAuthenticated: Boolean(session.token),
-      login: (token, user, role, username) => {
-        tokenStorage.set(token, user, role, username)
-        setSession({ token, user: user ?? null, role: role ?? null, username: username ?? null })
-      },
-      logout: () => {
-        tokenStorage.clear()
-        setSession({ token: null, user: null, role: null, username: null })
-      },
+      isAuthenticated: session.authenticated,
+      /** Goes to Keycloak's sign-in page; `hint` pre-fills the user name or e-mail. */
+      login: (hint) => keycloak.login({ redirectUri: window.location.origin + '/', loginHint: hint, locale: 'vi' }),
+      logout: () => keycloak.logout({ redirectUri: window.location.origin + '/login' }),
+      /** Keycloak's own page for changing the password. */
+      openAccount: () => keycloak.accountManagement(),
     }),
     [session],
   )
 
+  if (failed) return <p className="error" role="alert" style={{ padding: 24 }}>{failed}</p>
+  if (!session.ready) return <p className="muted" role="status" style={{ padding: 24 }}>Đang tải...</p>
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 

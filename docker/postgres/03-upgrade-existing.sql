@@ -40,25 +40,25 @@ CREATE TABLE IF NOT EXISTS book_cover (
 -- ===================== member_db =====================
 \connect member_db
 
-ALTER TABLE member ADD COLUMN IF NOT EXISTS password_hash varchar(100);
-
--- Librarians are now members with role LIBRARIAN: copy the old librarian rows over, then drop that table.
-ALTER TABLE member ADD COLUMN IF NOT EXISTS role varchar(20) NOT NULL DEFAULT 'MEMBER';
-ALTER TABLE member ADD COLUMN IF NOT EXISTS reset_code_hash varchar(100);
-ALTER TABLE member ADD COLUMN IF NOT EXISTS reset_code_expires_at timestamp(6) with time zone;
-ALTER TABLE member ADD COLUMN IF NOT EXISTS reset_code_attempts integer NOT NULL DEFAULT 0;
-ALTER TABLE member ADD COLUMN IF NOT EXISTS reset_code_sent_at timestamp(6) with time zone;
-DO $$
+-- Passwords, sign-in and the forgot-password e-mails moved to Keycloak: member keeps only the reader's profile.
+-- Librarian accounts now live in Keycloak too (TT-0001 is created by the realm file), so their rows (and the old
+-- librarian table) go. Run this ONLY after Keycloak is up with the "library" realm: once the password columns are
+-- dropped, the old member-service (main branch) can no longer let anybody sign in.
+DO $
 BEGIN
     IF to_regclass('public.librarian') IS NOT NULL THEN
-        INSERT INTO member (library_card_no, full_name, email, status, joined_at, role, password_hash, created_at, updated_at)
-        SELECT staff_code, full_name, lower(staff_code) || '@library.local',
-               CASE WHEN active THEN 'ACTIVE' ELSE 'LOCKED' END, created_at::date, 'LIBRARIAN', password_hash, created_at, updated_at
-          FROM librarian
-        ON CONFLICT (library_card_no) DO NOTHING;
         DROP TABLE librarian;
     END IF;
-END $$;
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'member' AND column_name = 'role') THEN
+        DELETE FROM member WHERE role = 'LIBRARIAN';
+    END IF;
+END $;
+ALTER TABLE member DROP COLUMN IF EXISTS password_hash;
+ALTER TABLE member DROP COLUMN IF EXISTS role;
+ALTER TABLE member DROP COLUMN IF EXISTS reset_code_hash;
+ALTER TABLE member DROP COLUMN IF EXISTS reset_code_expires_at;
+ALTER TABLE member DROP COLUMN IF EXISTS reset_code_attempts;
+ALTER TABLE member DROP COLUMN IF EXISTS reset_code_sent_at;
 
 -- ===================== loan_db =====================
 \connect loan_db

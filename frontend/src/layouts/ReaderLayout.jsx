@@ -11,7 +11,7 @@ const NOTIFICATION_POLL_MS = 60000
 
 /** The reader's shell: a sidebar to move between the catalogue, their loans, their fines and their notifications. */
 export default function ReaderLayout() {
-  const { user, username, logout } = useAuth()
+  const { user, username, logout, openAccount } = useAuth()
   const navigate = useNavigate()
   const loans = useFetch(readerApi.getMyLoans)
   const fines = useFetch(readerApi.getMyFines)
@@ -52,6 +52,7 @@ export default function ReaderLayout() {
         </nav>
         <div className="who">
           <b>{user ?? 'Bạn đọc'}</b>Bạn đọc · {username}
+          <button className="logout" type="button" onClick={openAccount}>Đổi mật khẩu</button>
           <button className="logout" type="button" onClick={handleLogout}>Đăng xuất</button>
         </div>
       </aside>

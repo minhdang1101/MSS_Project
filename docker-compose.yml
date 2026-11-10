@@ -2,7 +2,7 @@
 # Credentials come from .env (git-ignored) - copy .env.example to .env first.
 #
 # Two ways to run:
-#   docker compose up -d                       -> infrastructure only (PostgreSQL, RabbitMQ, Eureka, Mailpit);
+#   docker compose up -d                       -> infrastructure only (PostgreSQL, RabbitMQ, Eureka, Keycloak, Mailpit);
 #                                                 business services run from the IDE as before
 #   docker compose --profile app up -d --build -> the whole system in containers (adds the 5 services + API Gateway)
 #
@@ -97,6 +97,24 @@ services:
 
   # Fake mail server for notification-service: catches every email, shows it at http://localhost:8025.
   # Nothing is ever delivered to a real mailbox.
+  # Login server: sign-in, forgot-password e-mails, tokens (JWT, RS256). The realm "library" in docker/keycloak is
+  # imported on the first start. Admin console: http://localhost:8180 (KEYCLOAK_ADMIN / KEYCLOAK_ADMIN_PASSWORD in .env).
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0.7
+    container_name: dlms-keycloak
+    command: start-dev --import-realm
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN:-admin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
+      KC_HTTP_ENABLED: "true"
+      KC_HOSTNAME_STRICT: "false"
+    ports:
+      - "8180:8080"     # browser and tools use http://localhost:8180
+    volumes:
+      - ./docker/keycloak:/opt/keycloak/data/import:ro
+      - keycloak-data:/opt/keycloak/data
+    networks: [dlms]
+
   mailpit:
     image: axllent/mailpit:v1.21
     container_name: dlms-mailpit
@@ -130,11 +148,13 @@ services:
     environment:
       <<: *common-env
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/member_db
-      # Must be the same value as the gateway's, or the gateway rejects every token
-      APP_SECURITY_JWT_SECRET: ${JWT_SECRET}
-      # First librarian (TT-0001) is created with this password when the librarian table is empty
-      APP_BOOTSTRAP_LIBRARIAN_PASSWORD: ${LIBRARIAN_PASSWORD}
-    depends_on: *depends-on-infra
+      # member-service creates reader accounts in Keycloak through its Admin API
+      APP_KEYCLOAK_BASEURL: http://keycloak:8080
+      APP_KEYCLOAK_CLIENTSECRET: ${KEYCLOAK_MEMBER_SERVICE_SECRET:-member-service-dev-secret}
+    depends_on:
+      <<: *depends-on-infra
+      keycloak:
+        condition: service_started
 
   loan-service:
     <<: *spring-service
@@ -200,7 +220,9 @@ services:
         -Xmx384m -XX:+UseSerialGC
         -Deureka.client.service-url.defaultZone=http://eureka-server:8761/eureka/
       EUREKA_CLIENT_REGISTRYFETCHINTERVALSECONDS: 5
-      APP_SECURITY_JWT_SECRET: ${JWT_SECRET}
+      # Public keys come from Keycloak over the Docker network; "iss" is the address the browser logs in at
+      APP_SECURITY_JWT_JWKSETURI: http://keycloak:8080/realms/library/protocol/openid-connect/certs
+      APP_SECURITY_JWT_ISSUERURI: http://localhost:8180/realms/library
       APP_SECURITY_ENABLED: "true"
       # The React dev server (npm run dev) still runs on the host
       APP_CORS_ALLOWEDORIGINS: http://localhost:5173
@@ -216,3 +238,4 @@ networks:
 
 volumes:
   postgres-data:
+  keycloak-data:

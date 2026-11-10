@@ -10,21 +10,19 @@ import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
-import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.oauth2.core.OAuth2TokenValidator;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusReactiveJwtDecoder;
 import org.springframework.security.oauth2.jwt.ReactiveJwtDecoder;
-import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
-import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
-import org.springframework.security.oauth2.server.resource.authentication.ReactiveJwtAuthenticationConverterAdapter;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.security.web.server.SecurityWebFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.reactive.CorsConfigurationSource;
 import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
 import reactor.core.publisher.Mono;
 
-import javax.crypto.spec.SecretKeySpec;
-import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 import static fu.dlms.gateway.security.Roles.LIBRARIAN;
@@ -36,9 +34,9 @@ import static fu.dlms.gateway.security.Roles.MEMBER;
  * <p>Luồng của một request:
  * <ol>
  *   <li>CORS: cho phép frontend ở app.cors.allowed-origins gọi sang.</li>
- *   <li>Đọc header {@code Authorization: Bearer <token>}; {@link #jwtDecoder()} kiểm tra chữ ký HS256 (cùng secret với
- *       member-service) và hạn dùng (exp). Sai hoặc hết hạn → 401.</li>
- *   <li>{@link #roleConverter()} đọc claim "role" thành quyền ROLE_LIBRARIAN / ROLE_MEMBER.</li>
+ *   <li>Đọc header {@code Authorization: Bearer <token>}; {@link #jwtDecoder} kiểm tra chữ ký RS256 bằng khóa công khai
+ *       (JWKS) của Keycloak, hạn dùng (exp) và nơi cấp (iss). Sai hoặc hết hạn → 401.</li>
+ *   <li>{@link #roleConverter()} đọc role trong claim realm_access.roles thành quyền ROLE_LIBRARIAN / ROLE_MEMBER.</li>
  *   <li>So với bảng quyền trong {@link #securityWebFilterChain}. Không đủ quyền → 403.</li>
  *   <li>Qua hết thì UserIdentityHeadersFilter gắn X-Username / X-User-Role / X-Member-Id rồi chuyển tới service.</li>
  * </ol>
@@ -47,22 +45,24 @@ import static fu.dlms.gateway.security.Roles.MEMBER;
 @EnableWebFluxSecurity
 public class SecurityConfig {
 
-    private static final int MIN_SECRET_BYTES = 32;
-    /** The value shipped in application.properties.example; publicly known, so never acceptable. */
-    private static final String EXAMPLE_SECRET = "your_jwt_secret_at_least_32_characters";
-
     /** Defaults to true: forgetting the property must not leave every endpoint open. */
     @Value("${app.security.enabled:true}")
     private boolean securityEnabled;
 
-    @Value("${app.security.jwt.secret}")
-    private String jwtSecret;
+    /** Nơi Gateway tải khóa công khai của Keycloak (qua mạng nội bộ, có thể khác địa chỉ mà trình duyệt dùng). */
+    @Value("${app.security.jwt.jwk-set-uri}")
+    private String jwkSetUri;
+
+    /** Giá trị claim "iss" mà Keycloak ghi vào token (địa chỉ trình duyệt dùng, vd http://localhost:8180/realms/library). */
+    @Value("${app.security.jwt.issuer-uri}")
+    private String issuerUri;
 
     @Value("${app.cors.allowed-origins}")
     private List<String> allowedOrigins;
 
     @Bean
-    public SecurityWebFilterChain securityWebFilterChain(ServerHttpSecurity http, JsonSecurityErrorHandler errors) {
+    public SecurityWebFilterChain securityWebFilterChain(ServerHttpSecurity http, JsonSecurityErrorHandler errors,
+                                                         ReactiveJwtDecoder jwtDecoder) {
         http.csrf(ServerHttpSecurity.CsrfSpec::disable)
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()));
 
@@ -76,12 +76,9 @@ public class SecurityConfig {
                         // ---- Công khai: không cần token ----
                         .pathMatchers(HttpMethod.OPTIONS).permitAll()                 // CORS preflight
                         .pathMatchers("/actuator/health", "/actuator/health/**").permitAll()
-                        .pathMatchers(HttpMethod.POST, "/api/auth/login", "/api/auth/register",
-                                "/api/auth/forgot-password", "/api/auth/verify-reset-code",
-                                "/api/auth/reset-password").permitAll()
+                        // Đăng nhập, quên mật khẩu do Keycloak làm; chỉ còn đăng ký (cấp số thẻ + tạo tài khoản Keycloak) ở member-service
+                        .pathMatchers(HttpMethod.POST, "/api/auth/register").permitAll()
                         .pathMatchers(HttpMethod.GET, "/api/books/**").permitAll()   // tra cứu sách, ảnh bìa
-                        // ---- Mọi người đã đăng nhập ----
-                        .pathMatchers(HttpMethod.POST, "/api/auth/password").hasAnyRole(LIBRARIAN, MEMBER)
                         // ---- Chỉ độc giả: dữ liệu của chính mình (memberId lấy từ token) ----
                         .pathMatchers("/api/me/**").hasRole(MEMBER)                   // phiếu mượn, tiền phạt của mình
                         .pathMatchers(HttpMethod.GET, "/api/notifications/me").hasRole(MEMBER)
@@ -90,7 +87,7 @@ public class SecurityConfig {
                         .pathMatchers("/api/**").hasRole(LIBRARIAN)
                         .anyExchange().hasRole(LIBRARIAN))                           // vd /actuator/gateway
                 .oauth2ResourceServer(oauth -> oauth
-                        .jwt(jwt -> jwt.jwtDecoder(jwtDecoder()).jwtAuthenticationConverter(roleConverter()))
+                        .jwt(jwt -> jwt.jwtDecoder(jwtDecoder).jwtAuthenticationConverter(roleConverter()))
                         .authenticationEntryPoint(errors)   // 401 dạng JSON
                         .accessDeniedHandler(errors))       // 403 dạng JSON
                 .exceptionHandling(e -> e.authenticationEntryPoint(errors).accessDeniedHandler(errors))
@@ -98,34 +95,27 @@ public class SecurityConfig {
     }
 
     /**
-     * Đọc claim "role" (vd "LIBRARIAN") thành quyền "ROLE_LIBRARIAN"; hasRole("LIBRARIAN") so với chính chuỗi này.
-     * Mặc định Spring chỉ đọc claim "scope"/"scp", nên thiếu bước này thì mọi kiểm tra role đều thất bại.
+     * Keycloak để role trong claim lồng nhau realm_access.roles (không phải "scope" như Spring mong đợi), nên cần đọc
+     * thủ công: role "LIBRARIAN" thành quyền "ROLE_LIBRARIAN" để hasRole("LIBRARIAN") khớp. Các role khác của Keycloak
+     * (offline_access, uma_authorization...) bị bỏ qua.
      */
     static Converter<Jwt, Mono<AbstractAuthenticationToken>> roleConverter() {
-        JwtGrantedAuthoritiesConverter authorities = new JwtGrantedAuthoritiesConverter();
-        authorities.setAuthoritiesClaimName(Roles.ROLE_CLAIM);
-        authorities.setAuthorityPrefix("ROLE_");
-        JwtAuthenticationConverter converter = new JwtAuthenticationConverter();
-        converter.setJwtGrantedAuthoritiesConverter(authorities);
-        return new ReactiveJwtAuthenticationConverterAdapter(converter);
+        return jwt -> Mono.just(new JwtAuthenticationToken(jwt,
+                Roles.appRoles(jwt).stream().map(role -> new SimpleGrantedAuthority("ROLE_" + role)).toList(),
+                jwt.getClaimAsString(Roles.USERNAME_CLAIM) != null ? jwt.getClaimAsString(Roles.USERNAME_CLAIM) : jwt.getSubject()));
     }
 
     /**
-     * Kiểm tra chữ ký HS256 bằng secret dùng chung với member-service, và kiểm tra exp (hết hạn) mặc định.
-     * Từ chối khởi động nếu secret quá ngắn hoặc vẫn là giá trị mẫu (ai cũng biết → ai cũng giả được token).
+     * Kiểm tra chữ ký RS256 bằng khóa công khai tải từ Keycloak (JWKS, tải khi có request đầu tiên nên Gateway vẫn
+     * khởi động được khi Keycloak chưa chạy), kiểm tra exp và iss. Không giữ secret nào: ai cũng có thể kiểm tra
+     * token nhưng chỉ Keycloak ký được.
      */
     @Bean
     public ReactiveJwtDecoder jwtDecoder() {
-        if (jwtSecret.getBytes(StandardCharsets.UTF_8).length < MIN_SECRET_BYTES) {
-            throw new IllegalStateException("app.security.jwt.secret must be at least " + MIN_SECRET_BYTES + " bytes");
-        }
-        if (EXAMPLE_SECRET.equals(jwtSecret)) {
-            throw new IllegalStateException("app.security.jwt.secret is still the placeholder from "
-                    + "application.properties.example: anyone could forge tokens. Set your own secret "
-                    + "(same value as member-service).");
-        }
-        SecretKeySpec key = new SecretKeySpec(jwtSecret.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
-        return NimbusReactiveJwtDecoder.withSecretKey(key).macAlgorithm(MacAlgorithm.HS256).build();
+        NimbusReactiveJwtDecoder decoder = NimbusReactiveJwtDecoder.withJwkSetUri(jwkSetUri).build();
+        OAuth2TokenValidator<Jwt> validator = JwtValidators.createDefaultWithIssuer(issuerUri);
+        decoder.setJwtValidator(validator);
+        return decoder;
     }
 
     @Bean

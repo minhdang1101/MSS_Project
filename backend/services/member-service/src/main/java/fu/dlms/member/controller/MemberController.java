@@ -69,8 +69,8 @@ public class MemberController {
     }
 
     /**
-     * Gives the member a new random login password (the old one stops working). The answer carries it once
-     * ({@code initialPassword}); only its hash is stored, so it cannot be shown again.
+     * Sets a new temporary password in Keycloak (the old one stops working; the reader must change it at the next login). The answer carries it once
+     * ({@code initialPassword}); Keycloak stores only a hash, so it cannot be shown again.
      */
     @PostMapping("/{id}/password-reset")
     public MemberResponse resetPassword(@PathVariable Long id) {

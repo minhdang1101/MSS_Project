@@ -7,17 +7,17 @@ import fu.dlms.member.dto.MemberImportRow;
 import fu.dlms.member.dto.MemberRequest;
 import fu.dlms.member.dto.MemberResponse;
 import fu.dlms.member.entity.Member;
-import fu.dlms.member.entity.MemberRole;
 import fu.dlms.member.entity.MemberStatus;
 import fu.dlms.member.exception.DuplicateValueException;
 import fu.dlms.member.exception.ResourceNotFoundException;
+import fu.dlms.member.keycloak.KeycloakAdminClient;
+import fu.dlms.member.keycloak.KeycloakException;
 import fu.dlms.member.repository.MemberRepository;
 import fu.dlms.member.security.PasswordGenerator;
 import fu.dlms.member.service.MemberService;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validator;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,8 +29,12 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
+/**
+ * The reader's profile lives in the member table; the login account (username = card number, password, role MEMBER)
+ * lives in Keycloak. Every change that touches both runs in one transaction and calls Keycloak last, so when Keycloak
+ * refuses (or is down) the exception rolls the database change back and the two never disagree.
+ */
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -43,18 +47,18 @@ public class MemberServiceImpl implements MemberService {
     private final MemberRepository memberRepository;
     private final MemberExcelParser excelParser;
     private final CardNumberGenerator cardNumberGenerator;
-    private final PasswordEncoder passwordEncoder;
     private final PasswordGenerator passwordGenerator;
+    private final KeycloakAdminClient keycloak;
     private final Validator validator;
 
     @Override
     public List<MemberResponse> findAll() {
-        return memberRepository.findAllByRole(MemberRole.MEMBER).stream().map(MemberResponse::from).toList();
+        return memberRepository.findAll().stream().map(MemberResponse::from).toList();
     }
 
     @Override
     public MemberResponse findById(Long id) {
-        return reader(id)
+        return memberRepository.findById(id)
                 .map(MemberResponse::from)
                 .orElseThrow(() -> new ResourceNotFoundException(MEMBER, id));
     }
@@ -68,11 +72,10 @@ public class MemberServiceImpl implements MemberService {
         if (memberRepository.existsByPhone(request.phone())) {
             throw DuplicateValueException.phone();
         }
-        String cardNo = cardNumberGenerator.next(1).get(0);
-        Member member = newMember(cardNo, request);
+        // A password the library hands over: the reader must replace it at the first login
         String password = passwordGenerator.generate();
-        member.setPasswordHash(passwordEncoder.encode(password));
-        return MemberResponse.from(memberRepository.save(member)).withInitialPassword(password);
+        Member member = saveWithAccount(request, password, true);
+        return MemberResponse.from(member).withInitialPassword(password);
     }
 
     @Override
@@ -84,15 +87,13 @@ public class MemberServiceImpl implements MemberService {
         if (request.phone() != null && memberRepository.existsByPhone(request.phone())) {
             throw DuplicateValueException.phone();
         }
-        Member member = newMember(cardNumberGenerator.next(1).get(0), request);
-        member.setPasswordHash(passwordEncoder.encode(password));
-        return MemberResponse.from(memberRepository.save(member));
+        return MemberResponse.from(saveWithAccount(request, password, false));
     }
 
     @Override
     @Transactional
     public MemberResponse update(Long id, MemberRequest request) {
-        Member member = reader(id).orElseThrow(() -> new ResourceNotFoundException(MEMBER, id));
+        Member member = memberRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException(MEMBER, id));
         if (memberRepository.existsByEmailIgnoreCaseAndIdNot(request.email(), id)) {
             throw DuplicateValueException.email();
         }
@@ -102,15 +103,20 @@ public class MemberServiceImpl implements MemberService {
         member.setFullName(request.fullName());
         member.setEmail(request.email());
         member.setPhone(request.phone());
-        return MemberResponse.from(memberRepository.save(member));
+        Member saved = memberRepository.save(member);
+        keycloak.updateProfile(saved.getLibraryCardNo(), saved.getEmail(), saved.getFullName());
+        return MemberResponse.from(saved);
     }
 
     @Override
     @Transactional
     public MemberResponse changeStatus(Long id, MemberStatus status) {
-        Member member = reader(id).orElseThrow(() -> new ResourceNotFoundException(MEMBER, id));
+        Member member = memberRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException(MEMBER, id));
         member.setStatus(status);
-        return MemberResponse.from(memberRepository.save(member));
+        Member saved = memberRepository.save(member);
+        // A suspended reader may still sign in to see their loans and fines; only a locked card is shut out
+        keycloak.setEnabled(saved.getLibraryCardNo(), status != MemberStatus.LOCKED);
+        return MemberResponse.from(saved);
     }
 
     @Override
@@ -118,6 +124,7 @@ public class MemberServiceImpl implements MemberService {
     public MemberImportResult importFromExcel(InputStream xlsx) {
         List<MemberImportRow> rows = excelParser.parse(xlsx);
         List<MemberRequest> accepted = new ArrayList<>();
+        List<Integer> acceptedRowNumbers = new ArrayList<>();
         List<RowError> errors = new ArrayList<>();
         Set<String> emailsInFile = new HashSet<>();
         Set<String> phonesInFile = new HashSet<>();
@@ -132,41 +139,48 @@ public class MemberServiceImpl implements MemberService {
             emailsInFile.add(request.email().toLowerCase(Locale.ROOT));
             phonesInFile.add(request.phone());
             accepted.add(request);
+            acceptedRowNumbers.add(row.rowNumber());
         }
 
         if (accepted.isEmpty()) {
             return new MemberImportResult(0, errors, List.of());
         }
 
-        // Card numbers are issued only for rows that will really be saved, so no number is wasted on a bad row.
+        // A card number and a Keycloak account are made only for rows that passed every check
         List<String> cardNumbers = cardNumberGenerator.next(accepted.size());
-        List<String> passwords = new ArrayList<>();
-        for (int i = 0; i < accepted.size(); i++) {
-            passwords.add(passwordGenerator.generate());
-        }
-        // BCrypt is deliberately slow (about 0.1 s each), so hash the whole batch on all cores at once.
-        List<String> hashes = IntStream.range(0, accepted.size()).parallel()
-                .mapToObj(i -> passwordEncoder.encode(passwords.get(i))).toList();
-
-        List<Member> toSave = new ArrayList<>();
         List<IssuedCredential> credentials = new ArrayList<>();
         for (int i = 0; i < accepted.size(); i++) {
-            Member member = newMember(cardNumbers.get(i), accepted.get(i));
-            member.setPasswordHash(hashes.get(i));
-            toSave.add(member);
-            credentials.add(new IssuedCredential(member.getLibraryCardNo(), member.getFullName(), passwords.get(i)));
+            String password = passwordGenerator.generate();
+            Member member = memberRepository.saveAndFlush(newMember(cardNumbers.get(i), accepted.get(i)));
+            try {
+                keycloak.createReader(member.getLibraryCardNo(), member.getEmail(), member.getFullName(), member.getId(),
+                        password, true);
+            } catch (KeycloakException e) {
+                // One bad row must not sink the whole file: report it and drop its profile again
+                memberRepository.delete(member);
+                errors.add(new RowError(acceptedRowNumbers.get(i), "Không tạo được tài khoản đăng nhập: " + e.getMessage()));
+                continue;
+            }
+            credentials.add(new IssuedCredential(member.getLibraryCardNo(), member.getFullName(), password));
         }
-        memberRepository.saveAll(toSave);
-        return new MemberImportResult(toSave.size(), errors, credentials);
+        return new MemberImportResult(credentials.size(), errors, credentials);
     }
 
     @Override
     @Transactional
     public MemberResponse resetPassword(Long id) {
-        Member member = reader(id).orElseThrow(() -> new ResourceNotFoundException(MEMBER, id));
+        Member member = memberRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException(MEMBER, id));
         String password = passwordGenerator.generate();
-        member.setPasswordHash(passwordEncoder.encode(password));
-        return MemberResponse.from(memberRepository.save(member)).withInitialPassword(password);
+        keycloak.setPassword(member.getLibraryCardNo(), password, true);
+        return MemberResponse.from(member).withInitialPassword(password);
+    }
+
+    /** Saves the profile (that gives it an id), then creates the matching login account in Keycloak. */
+    private Member saveWithAccount(MemberRequest request, String password, boolean temporaryPassword) {
+        Member member = memberRepository.saveAndFlush(newMember(cardNumberGenerator.next(1).get(0), request));
+        keycloak.createReader(member.getLibraryCardNo(), member.getEmail(), member.getFullName(), member.getId(),
+                password, temporaryPassword);
+        return member;
     }
 
     /** Returns a human-readable reason this row cannot be imported, or null when it can. */
@@ -198,11 +212,6 @@ public class MemberServiceImpl implements MemberService {
             default -> violation.getPropertyPath().toString();
         };
         return field + ": " + violation.getMessage();
-    }
-
-    /** Only readers are managed on the Members screen: a librarian's account is never touched from it. */
-    private java.util.Optional<Member> reader(Long id) {
-        return memberRepository.findById(id).filter(m -> m.getRole() == MemberRole.MEMBER);
     }
 
     private Member newMember(String cardNo, MemberRequest request) {

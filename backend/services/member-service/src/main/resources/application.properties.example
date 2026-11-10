@@ -22,21 +22,13 @@ eureka.instance.prefer-ip-address=true
 # ===== Actuator =====
 management.endpoints.web.exposure.include=health,info
 
-# ===== JWT (must match the api-gateway secret, >= 32 chars) =====
-app.security.jwt.secret=your_jwt_secret_at_least_32_characters
-app.security.jwt.expiration-minutes=480
-
 # ===== Excel import =====
 spring.servlet.multipart.max-file-size=2MB
 spring.servlet.multipart.max-request-size=2MB
 
-# ===== E-mail for the "forgot password" code =====
-# Leave spring.mail.host out while developing: the code is then printed in this service's log instead of mailed.
-# Gmail: use an App Password (Google account > Security > 2-Step Verification > App passwords), not the real password.
-#spring.mail.host=smtp.gmail.com
-#spring.mail.port=587
-#spring.mail.username=your_email@gmail.com
-#spring.mail.password=your_app_password
-#spring.mail.properties.mail.smtp.auth=true
-#spring.mail.properties.mail.smtp.starttls.enable=true
-#app.mail.from=your_email@gmail.com
+# ===== Keycloak: sign-in, passwords and tokens live there; this service creates reader accounts through its Admin API =====
+app.keycloak.base-url=http://localhost:8180
+app.keycloak.realm=library
+app.keycloak.client-id=member-service
+# Secret of the member-service client (docker/keycloak/library-realm.json); the dev value below matches that file
+app.keycloak.client-secret=member-service-dev-secret

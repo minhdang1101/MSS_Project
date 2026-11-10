@@ -8,6 +8,8 @@ import fu.dlms.member.entity.Member;
 import fu.dlms.member.entity.MemberStatus;
 import fu.dlms.member.exception.DuplicateValueException;
 import fu.dlms.member.exception.ResourceNotFoundException;
+import fu.dlms.member.keycloak.KeycloakAdminClient;
+import fu.dlms.member.keycloak.KeycloakException;
 import fu.dlms.member.repository.MemberRepository;
 import fu.dlms.member.security.PasswordGenerator;
 import fu.dlms.member.service.impl.CardNumberGenerator;
@@ -17,8 +19,6 @@ import jakarta.validation.Validation;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.io.ByteArrayInputStream;
 import java.time.LocalDate;
@@ -30,6 +30,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -40,16 +41,24 @@ class MemberServiceImplTest {
     private final MemberRepository repository = mock(MemberRepository.class);
     private final MemberExcelParser parser = mock(MemberExcelParser.class);
     private final CardNumberGenerator cardNumbers = mock(CardNumberGenerator.class);
-    private final PasswordEncoder encoder = new BCryptPasswordEncoder(4);
+    private final KeycloakAdminClient keycloak = mock(KeycloakAdminClient.class);
     private final PasswordGenerator passwords = mock(PasswordGenerator.class);
     private MemberServiceImpl service;
 
     @BeforeEach
     void setUp() {
         when(passwords.generate()).thenReturn("Abcd2345Wxyz", "Efgh6789Wxyz", "Jklm2345Wxyz");
-        service = new MemberServiceImpl(repository, parser, cardNumbers, encoder, passwords,
+        service = new MemberServiceImpl(repository, parser, cardNumbers, passwords, keycloak,
                 Validation.buildDefaultValidatorFactory().getValidator());
         when(repository.save(any(Member.class))).thenAnswer(inv -> inv.getArgument(0));
+        // the database gives a new profile its id
+        when(repository.saveAndFlush(any(Member.class))).thenAnswer(inv -> {
+            Member m = inv.getArgument(0);
+            if (m.getId() == null) {
+                m.setId(77L);
+            }
+            return m;
+        });
     }
 
     private static Member member(long id, String card, String email) {
@@ -60,30 +69,6 @@ class MemberServiceImplTest {
         m.setEmail(email);
         m.setJoinedAt(LocalDate.of(2025, 1, 1));
         return m;
-    }
-
-    // ---------- librarians are not managed here ----------
-
-    @Test
-    void theMembersScreenListsReadersOnly() {
-        when(repository.findAllByRole(fu.dlms.member.entity.MemberRole.MEMBER)).thenReturn(List.of(member(1, "TV-0001", "a@x.com")));
-
-        assertThat(service.findAll()).hasSize(1);
-        org.mockito.Mockito.verify(repository, org.mockito.Mockito.never()).findAll();
-    }
-
-    @Test
-    void aLibrarianCannotBeSuspendedOrReadThroughTheMembersApi() {
-        Member librarian = member(9, "TT-0001", "tt@library.local");
-        librarian.setRole(fu.dlms.member.entity.MemberRole.LIBRARIAN);
-        when(repository.findById(9L)).thenReturn(java.util.Optional.of(librarian));
-
-        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.changeStatus(9L, fu.dlms.member.entity.MemberStatus.LOCKED))
-                .isInstanceOf(fu.dlms.member.exception.ResourceNotFoundException.class);
-        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.resetPassword(9L))
-                .isInstanceOf(fu.dlms.member.exception.ResourceNotFoundException.class);
-        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.findById(9L))
-                .isInstanceOf(fu.dlms.member.exception.ResourceNotFoundException.class);
     }
 
     // ---------- create ----------
@@ -123,44 +108,57 @@ class MemberServiceImplTest {
         verify(cardNumbers, never()).next(anyInt());
     }
 
-    // ---------- passwords ----------
+    // ---------- the login account lives in Keycloak ----------
 
     @Test
-    void createGivesTheNewMemberAFreshPasswordStoredOnlyAsABcryptHashAndShownOnce() {
+    void createMakesAKeycloakAccountWithATemporaryPasswordAndShowsItOnce() {
         when(cardNumbers.next(1)).thenReturn(List.of("TV-0413"));
-        ArgumentCaptor<Member> saved = ArgumentCaptor.forClass(Member.class);
 
         MemberResponse response = service.create(new MemberRequest("Nguyễn A", "a@example.com", "0900000001"));
 
-        verify(repository).save(saved.capture());
+        verify(keycloak).createReader("TV-0413", "a@example.com", "Nguyễn A", 77L, "Abcd2345Wxyz", true);
         assertThat(response.initialPassword()).isEqualTo("Abcd2345Wxyz");
-        assertThat(saved.getValue().getPasswordHash()).isNotEqualTo("Abcd2345Wxyz").startsWith("$2");
-        assertThat(encoder.matches("Abcd2345Wxyz", saved.getValue().getPasswordHash())).isTrue();
     }
 
     @Test
-    void listingAndLookingUpMembersNeverRevealsAPasswordOrItsHash() {
+    void registerMakesAKeycloakAccountWithThePasswordTheReaderChose() {
+        when(cardNumbers.next(1)).thenReturn(List.of("TV-0413"));
+
+        MemberResponse response = service.register(new MemberRequest("Nguyễn A", "a@example.com", null), "my-own-password");
+
+        verify(keycloak).createReader("TV-0413", "a@example.com", "Nguyễn A", 77L, "my-own-password", false);
+        assertThat(response.initialPassword()).isNull();
+        assertThat(response.libraryCardNo()).isEqualTo("TV-0413");
+    }
+
+    @Test
+    void ifKeycloakRefusesTheErrorReachesTheCallerSoTheTransactionRollsBack() {
+        when(cardNumbers.next(1)).thenReturn(List.of("TV-0413"));
+        org.mockito.Mockito.doThrow(new KeycloakException("Keycloak down"))
+                .when(keycloak).createReader(any(), any(), any(), org.mockito.ArgumentMatchers.anyLong(), any(), org.mockito.ArgumentMatchers.anyBoolean());
+
+        assertThatThrownBy(() -> service.create(new MemberRequest("Nguyễn A", "a@example.com", "0900000001")))
+                .isInstanceOf(KeycloakException.class);
+    }
+
+    @Test
+    void listingAndLookingUpMembersNeverRevealsAPassword() {
         Member existing = member(1, "TV-1", "one@example.com");
-        existing.setPasswordHash(encoder.encode("secret-value"));
         when(repository.findById(1L)).thenReturn(Optional.of(existing));
         when(repository.findAll()).thenReturn(List.of(existing));
 
         assertThat(service.findById(1L).initialPassword()).isNull();
         assertThat(service.findAll()).allSatisfy(r -> assertThat(r.initialPassword()).isNull());
-        assertThat(MemberResponse.class.getRecordComponents()).extracting(c -> c.getName()).doesNotContain("passwordHash");
     }
 
     @Test
-    void resettingAPasswordStoresANewHashAndReturnsTheNewPasswordOnce() {
-        Member existing = member(1, "TV-1", "one@example.com");
-        existing.setPasswordHash(encoder.encode("old-password-1"));
-        when(repository.findById(1L)).thenReturn(Optional.of(existing));
+    void resettingAPasswordSetsANewTemporaryOneInKeycloakAndReturnsItOnce() {
+        when(repository.findById(1L)).thenReturn(Optional.of(member(1, "TV-1", "one@example.com")));
 
         MemberResponse response = service.resetPassword(1L);
 
+        verify(keycloak).setPassword("TV-1", "Abcd2345Wxyz", true);
         assertThat(response.initialPassword()).isEqualTo("Abcd2345Wxyz");
-        assertThat(encoder.matches("Abcd2345Wxyz", existing.getPasswordHash())).isTrue();
-        assertThat(encoder.matches("old-password-1", existing.getPasswordHash())).isFalse();
         assertThat(response.libraryCardNo()).isEqualTo("TV-1");
     }
 
@@ -169,27 +167,50 @@ class MemberServiceImplTest {
         when(repository.findById(9L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.resetPassword(9L)).isInstanceOf(ResourceNotFoundException.class);
+        verify(keycloak, never()).setPassword(any(), any(), org.mockito.ArgumentMatchers.anyBoolean());
     }
 
     @Test
-    @SuppressWarnings("unchecked")
-    void importGivesEveryImportedMemberItsOwnPasswordAndListsThemOnceForThePrintout() {
+    void lockingACardSwitchesTheAccountOffAndAnyOtherStatusKeepsItOn() {
+        when(repository.findById(1L)).thenReturn(Optional.of(member(1, "TV-1", "one@example.com")));
+
+        service.changeStatus(1L, MemberStatus.LOCKED);
+        service.changeStatus(1L, MemberStatus.SUSPENDED);
+        service.changeStatus(1L, MemberStatus.ACTIVE);
+
+        verify(keycloak).setEnabled("TV-1", false);
+        verify(keycloak, org.mockito.Mockito.times(2)).setEnabled("TV-1", true);
+    }
+
+    @Test
+    void editingAMemberKeepsTheKeycloakAccountInStep() {
+        when(repository.findById(1L)).thenReturn(Optional.of(member(1, "TV-1", "one@example.com")));
+
+        service.update(1L, new MemberRequest("Tên mới", "new@example.com", "0900000009"));
+
+        verify(keycloak).updateProfile("TV-1", "new@example.com", "Tên mới");
+    }
+
+    @Test
+    void importMakesAnAccountForEveryGoodRowAndReportsTheOnesKeycloakRefused() {
         when(parser.parse(any())).thenReturn(List.of(
                 new MemberImportRow(2, "Một", "one@example.com", "0900000001"),
                 new MemberImportRow(3, "Email hỏng", "bad", "0900000002"),
-                new MemberImportRow(4, "Hai", "two@example.com", "0900000003")));
-        when(cardNumbers.next(2)).thenReturn(List.of("TV-0413", "TV-0414"));
+                new MemberImportRow(4, "Hai", "two@example.com", "0900000003"),
+                new MemberImportRow(5, "Ba", "three@example.com", "0900000004")));
+        when(cardNumbers.next(3)).thenReturn(List.of("TV-0413", "TV-0414", "TV-0415"));
+        org.mockito.Mockito.doThrow(new KeycloakException("trùng"))
+                .when(keycloak).createReader(eq("TV-0414"), any(), any(), org.mockito.ArgumentMatchers.anyLong(), any(), org.mockito.ArgumentMatchers.anyBoolean());
 
         MemberImportResult result = service.importFromExcel(new ByteArrayInputStream(new byte[0]));
 
-        assertThat(result.credentials()).extracting(MemberImportResult.IssuedCredential::libraryCardNo, MemberImportResult.IssuedCredential::fullName, MemberImportResult.IssuedCredential::initialPassword)
-                .containsExactly(
-                        org.assertj.core.groups.Tuple.tuple("TV-0413", "Một", "Abcd2345Wxyz"),
-                        org.assertj.core.groups.Tuple.tuple("TV-0414", "Hai", "Efgh6789Wxyz"));
-        ArgumentCaptor<List<Member>> saved = ArgumentCaptor.forClass(List.class);
-        verify(repository).saveAll(saved.capture());
-        assertThat(saved.getValue()).allSatisfy(m -> assertThat(m.getPasswordHash()).startsWith("$2"));
-        assertThat(encoder.matches("Efgh6789Wxyz", saved.getValue().get(1).getPasswordHash())).isTrue();
+        assertThat(result.imported()).isEqualTo(2);
+        assertThat(result.credentials()).extracting(MemberImportResult.IssuedCredential::libraryCardNo,
+                        MemberImportResult.IssuedCredential::initialPassword)
+                .containsExactly(org.assertj.core.groups.Tuple.tuple("TV-0413", "Abcd2345Wxyz"),
+                        org.assertj.core.groups.Tuple.tuple("TV-0415", "Jklm2345Wxyz"));
+        assertThat(result.errors()).extracting(MemberImportResult.RowError::row).containsExactlyInAnyOrder(3, 4);
+        verify(repository).delete(any(Member.class)); // the refused row's profile is removed again
     }
 
     // ---------- update ----------
@@ -264,11 +285,11 @@ class MemberServiceImplTest {
 
         MemberImportResult result = service.importFromExcel(new ByteArrayInputStream(new byte[0]));
 
-        ArgumentCaptor<List<Member>> saved = ArgumentCaptor.forClass(List.class);
-        verify(repository).saveAll(saved.capture());
-        assertThat(saved.getValue()).extracting(Member::getLibraryCardNo).containsExactly("TV-0413", "TV-0414");
-        assertThat(saved.getValue()).extracting(Member::getFullName).containsExactly("Hợp lệ một", "Hợp lệ hai");
-        assertThat(saved.getValue()).allSatisfy(m -> {
+        ArgumentCaptor<Member> saved = ArgumentCaptor.forClass(Member.class);
+        verify(repository, org.mockito.Mockito.times(2)).saveAndFlush(saved.capture());
+        assertThat(saved.getAllValues()).extracting(Member::getLibraryCardNo).containsExactly("TV-0413", "TV-0414");
+        assertThat(saved.getAllValues()).extracting(Member::getFullName).containsExactly("Hợp lệ một", "Hợp lệ hai");
+        assertThat(saved.getAllValues()).allSatisfy(m -> {
             assertThat(m.getStatus()).isEqualTo(MemberStatus.ACTIVE);
             assertThat(m.getJoinedAt()).isEqualTo(LocalDate.now());
         });

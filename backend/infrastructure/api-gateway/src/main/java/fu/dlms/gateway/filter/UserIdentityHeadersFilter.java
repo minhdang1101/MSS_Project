@@ -16,11 +16,11 @@ import reactor.core.publisher.Mono;
  *
  * <p>Các service phía sau không tự kiểm tra JWT (chỉ Gateway làm). Khi cần biết ai đang gọi, chúng đọc header:
  * <ul>
- *   <li>{@code X-Username}: claim "sub" (mã nhân viên TT-xxxx hoặc số thẻ độc giả TV-xxxx)</li>
- *   <li>{@code X-User-Role}: claim "role" (LIBRARIAN / MEMBER)</li>
+ *   <li>{@code X-Username}: claim "preferred_username" (mã thủ thư TT-xxxx hoặc số thẻ độc giả TV-xxxx)</li>
+ *   <li>{@code X-User-Role}: role trong realm_access.roles (LIBRARIAN / MEMBER)</li>
  *   <li>{@code X-Member-Id}: claim "mid", chỉ có với độc giả</li>
  * </ul>
- * Vd member-service POST /api/auth/password đọc X-User-Role + X-Username; notification-service GET
+ * Vd notification-service GET
  * /api/notifications/me đọc X-Member-Id.
  *
  * <p><b>Chống giả mạo:</b> header do client tự gửi lên luôn bị XÓA trước, rồi mới điền lại từ token đã xác minh.
@@ -52,8 +52,8 @@ public class UserIdentityHeadersFilter implements GlobalFilter, Ordered {
             headers.remove(ROLE);
             headers.remove(MEMBER_ID);
             if (jwt != null) {
-                setIfPresent(headers, USERNAME, jwt.getSubject());
-                setIfPresent(headers, ROLE, jwt.getClaimAsString(Roles.ROLE_CLAIM));
+                setIfPresent(headers, USERNAME, jwt.getClaimAsString(Roles.USERNAME_CLAIM));
+                setIfPresent(headers, ROLE, Roles.primaryRole(jwt));
                 setIfPresent(headers, MEMBER_ID, jwt.getClaimAsString(Roles.MEMBER_ID_CLAIM));
             }
         }).build();

@@ -3,9 +3,11 @@ server.port=8080
 
 eureka.client.service-url.defaultZone=http://localhost:8761/eureka/
 
-# ===== JWT (HMAC-SHA256 shared secret) =====
-app.security.jwt.secret=your_jwt_secret_at_least_32_characters
-# JWTs are issued by member-service at POST /api/auth/login (same secret as member-service)
+# ===== JWT do Keycloak cấp (RS256): Gateway chỉ cần khóa công khai, không có secret nào =====
+# jwk-set-uri: nơi tải khóa công khai (địa chỉ Gateway gọi tới Keycloak)
+app.security.jwt.jwk-set-uri=http://localhost:8180/realms/library/protocol/openid-connect/certs
+# issuer-uri: giá trị claim iss trong token, đúng như địa chỉ trình duyệt dùng để đăng nhập
+app.security.jwt.issuer-uri=http://localhost:8180/realms/library
 app.security.enabled=true
 
 # ===== CORS (React dev server) =====

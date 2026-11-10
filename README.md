@@ -17,7 +17,7 @@ digital-library/
 │   ├── pom.xml                         # Maven parent (multi-module)
 │   ├── infrastructure/
 │   │   ├── eureka-server/   :8761      # Service registry
-│   │   └── api-gateway/     :8080      # Single entry point, CORS, JWT
+│   │   └── api-gateway/     :8080      # Single entry point, CORS, kiểm tra JWT của Keycloak
 │   └── services/
 │       ├── book-catalog-service :8081  # catalog_db  - book, book_copy, reservation, processed_event
 │       ├── member-service       :8082  # member_db   - member
@@ -74,13 +74,13 @@ cp .env.example .env
 ## Chạy toàn bộ hệ thống bằng Docker
 
 ```bash
-cp .env.example .env              # điền POSTGRES_*, JWT_SECRET (>= 32 ký tự), LIBRARIAN_PASSWORD
+cp .env.example .env              # điền POSTGRES_*, KEYCLOAK_ADMIN_PASSWORD
 docker compose --profile app up -d --build
 docker compose --profile app ps   # chờ tất cả "healthy" (lần đầu build mất vài phút)
 cd frontend && npm run dev        # frontend vẫn chạy trên máy, gọi Gateway ở http://localhost:8080/api
 ```
 
-- Đăng nhập thủ thư: `TT-0001` / giá trị `LIBRARIAN_PASSWORD` trong `.env`.
+- Đăng nhập thủ thư: `TT-0001` / `Admin@12345` (tạo sẵn trong `docker/keycloak/library-realm.json`, chỉ dùng khi phát triển).
 - Chỉ Gateway (8080) mở ra ngoài cho API; các service 8081–8085 chỉ nói chuyện trong network `dlms-network`
   và gọi nhau bằng **tên service** (`postgres:5432`, `rabbitmq:5672`, `eureka-server:8761`), không phải `localhost`.
 - Cấu hình không bí mật của mỗi service nằm trong `ENV` của Dockerfile; mật khẩu và địa chỉ lấy từ `.env`
@@ -90,6 +90,26 @@ cd frontend && npm run dev        # frontend vẫn chạy trên máy, gọi Gate
 - Xem log: `docker compose logs -f notification-service`. Dừng: `docker compose --profile app down`
   (thêm `-v` để xoá cả dữ liệu).
 
+## Đăng nhập bằng Keycloak
+
+Đăng nhập, mật khẩu, quên mật khẩu (gửi email) và cấp token do **Keycloak** (http://localhost:8180) làm; code của dự án
+không còn tự cấp token hay lưu mật khẩu.
+
+- `docker compose up -d` chạy Keycloak và tự nạp realm `library` từ `docker/keycloak/library-realm.json`:
+  role `LIBRARIAN` / `MEMBER`, client `library-web` (frontend, PKCE) và client `member-service` (Admin API).
+- Tài khoản dev: thủ thư `TT-0001` / `Admin@12345`; bạn đọc mẫu `TV-0412`, `TV-0087`, `TV-1130`, `TV-0256`, `TV-0901`
+  / `Reader@12345`. Trang quản trị Keycloak: http://localhost:8180 (`KEYCLOAK_ADMIN` trong `.env`, mặc định admin/admin).
+- Tên đăng nhập của bạn đọc là **số thẻ** (hoặc email). Bảng `member` chỉ còn hồ sơ; mật khẩu nằm ở Keycloak.
+- Token do Keycloak ký **RS256**: Gateway chỉ cần khóa công khai (`app.security.jwt.jwk-set-uri`, `issuer-uri`),
+  không còn secret dùng chung. Role đọc từ `realm_access.roles`; `mid` (id bạn đọc) là thuộc tính người dùng do
+  member-service ghi khi cấp thẻ.
+- Thủ thư cấp thẻ / nhập Excel / cấp lại mật khẩu: member-service tạo hoặc đổi tài khoản qua Keycloak Admin API
+  (mật khẩu tạm, bạn đọc phải đổi ở lần đăng nhập đầu). Khóa thẻ (`LOCKED`) sẽ tắt tài khoản Keycloak.
+- Email quên mật khẩu mặc định đi qua Mailpit (http://localhost:8025). Muốn gửi email thật, đặt SMTP trong Keycloak:
+  Realm settings → Email.
+- Nâng cấp database cũ: chạy `docker/postgres/03-upgrade-existing.sql` (xóa cột mật khẩu của `member`) **sau khi** Keycloak
+  đã chạy với realm `library`.
+
 ## API Gateway: route và phân quyền
 
 Route khai báo trong code `GatewayRoutesConfig` (không còn trong `application.properties`; ai còn các dòng
@@ -97,8 +117,7 @@ Route khai báo trong code `GatewayRoutesConfig` (không còn trong `application
 
 | Đường dẫn | Ai được gọi |
 |---|---|
-| `POST /api/auth/login`, `GET /api/books/**`, `/actuator/health` | Công khai |
-| `POST /api/auth/password` | LIBRARIAN, MEMBER |
+| `POST /api/auth/register`, `GET /api/books/**`, `/actuator/health` | Công khai |
 | `GET /api/notifications/me`, `PATCH /api/notifications/{id}/read` | MEMBER (dữ liệu của chính mình) |
 | Mọi `/api/**` còn lại | LIBRARIAN |
 

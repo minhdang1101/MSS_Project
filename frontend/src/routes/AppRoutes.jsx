@@ -3,7 +3,6 @@ import MainLayout from '../layouts/MainLayout.jsx'
 import ReaderLayout from '../layouts/ReaderLayout.jsx'
 import DashboardPage from '../pages/DashboardPage.jsx'
 import NotFoundPage from '../pages/NotFoundPage.jsx'
-import ForgotPasswordPage from '../pages/auth/ForgotPasswordPage.jsx'
 import LoginPage from '../pages/auth/LoginPage.jsx'
 import RegisterPage from '../pages/auth/RegisterPage.jsx'
 import BookListPage from '../pages/books/BookListPage.jsx'
@@ -24,7 +23,6 @@ export default function AppRoutes() {
     <Routes>
       <Route path="login" element={<LoginPage />} />
       <Route path="register" element={<RegisterPage />} />
-      <Route path="forgot-password" element={<ForgotPasswordPage />} />
 
       {/* Librarians: the management screens */}
       <Route element={<RequireAuth role={LIBRARIAN} />}>

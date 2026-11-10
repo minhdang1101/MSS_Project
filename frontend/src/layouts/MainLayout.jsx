@@ -12,7 +12,7 @@ const NAV_ITEMS = [
 ]
 
 export default function MainLayout() {
-  const { user, logout } = useAuth()
+  const { user, logout, openAccount } = useAuth()
   const navigate = useNavigate()
   const { pathname } = useLocation()
 
@@ -34,6 +34,7 @@ export default function MainLayout() {
         </nav>
         <div className="who">
           <b>{user ?? 'Thủ thư'}</b>Thủ thư
+          <button className="logout" type="button" onClick={openAccount}>Đổi mật khẩu</button>
           <button className="logout" type="button" onClick={handleLogout}>Đăng xuất</button>
         </div>
       </aside>

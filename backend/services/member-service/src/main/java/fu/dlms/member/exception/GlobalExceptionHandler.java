@@ -1,6 +1,7 @@
 package fu.dlms.member.exception;
 
 import fu.dlms.member.dto.ApiError;
+import fu.dlms.member.keycloak.KeycloakException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.NestedExceptionUtils;
@@ -9,7 +10,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
-import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
@@ -64,21 +64,10 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.CONFLICT, "Dữ liệu bị trùng hoặc không hợp lệ. Tải lại danh sách rồi thử lại.", request, null);
     }
 
-    @ExceptionHandler(InvalidCredentialsException.class)
-    public ResponseEntity<ApiError> handleInvalidCredentials(InvalidCredentialsException ex,
-                                                             HttpServletRequest request) {
-        return build(HttpStatus.UNAUTHORIZED, ex.getMessage(), request, null);
-    }
-
-    /** The identity headers are missing: the call did not come through the gateway with a valid token. */
-    @ExceptionHandler(MissingRequestHeaderException.class)
-    public ResponseEntity<ApiError> handleMissingHeader(MissingRequestHeaderException ex, HttpServletRequest request) {
-        return build(HttpStatus.UNAUTHORIZED, "Cần đăng nhập để thực hiện việc này.", request, null);
-    }
-
-    @ExceptionHandler(TooManyLoginAttemptsException.class)
-    public ResponseEntity<ApiError> handleTooManyLogins(TooManyLoginAttemptsException ex, HttpServletRequest request) {
-        return build(HttpStatus.TOO_MANY_REQUESTS, ex.getMessage(), request, null);
+    /** Keycloak is down, or refused to create or change an account: nothing was saved. */
+    @ExceptionHandler(KeycloakException.class)
+    public ResponseEntity<ApiError> handleKeycloak(KeycloakException ex, HttpServletRequest request) {
+        return build(HttpStatus.SERVICE_UNAVAILABLE, ex.getMessage(), request, null);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, Navigate, useNavigate } from 'react-router-dom'
+import { Link, Navigate } from 'react-router-dom'
 import authApi from '../../api/authApi.js'
 import PasswordInput from '../../components/PasswordInput.jsx'
 import Spinner from '../../components/Spinner.jsx'
@@ -26,10 +26,10 @@ function validate(form) {
   return errors
 }
 
-/** A reader creates their own account. They get a library card number and are signed in straight away. */
+/** A reader creates their own account and gets a library card number; they then sign in on Keycloak's page. */
 export default function RegisterPage() {
   const { isAuthenticated, role, login } = useAuth()
-  const navigate = useNavigate()
+  const [created, setCreated] = useState(null) // the answer of the sign-up: the new card number
   const [form, setForm] = useState({ fullName: '', email: '', password: '', confirm: '' })
   const [fieldErrors, setFieldErrors] = useState({})
   const [error, setError] = useState(null)
@@ -53,19 +53,35 @@ export default function RegisterPage() {
     setSubmitting(true)
     setError(null)
     try {
-      const session = await authApi.register({
+      setCreated(await authApi.register({
         fullName: form.fullName.trim(),
         email: form.email.trim(),
         password: form.password,
-      })
-      login(session.token, session.fullName, session.role, session.username)
-      navigate(homeFor(session.role), { replace: true, state: { welcomeCard: session.username } })
+      }))
     } catch (err) {
       setFieldErrors(err.fieldErrors ?? {})
       setError(err.fieldErrors ? 'Kiểm tra lại các ô được đánh dấu.'
         : (err.message ?? 'Không kết nối được máy chủ. Thử lại sau.'))
       setSubmitting(false)
     }
+  }
+
+  if (created) {
+    return (
+      <section className="login" aria-labelledby="done-title">
+        <div className="card enter">
+          <div className="card-head">
+            <div className="brand-dark">Thư viện</div>
+            <span className="hole" aria-hidden="true" />
+          </div>
+          <h1 id="done-title">Đã tạo tài khoản</h1>
+          <p className="notice" role="status">
+            Số thẻ của bạn là <b>{created.libraryCardNo}</b>. Đăng nhập bằng số thẻ hoặc email <b>{created.email}</b>.
+          </p>
+          <button className="btn primary wide" type="button" onClick={() => login(created.email)}>Đăng nhập ngay</button>
+        </div>
+      </section>
+    )
   }
 
   return (

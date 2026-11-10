@@ -7,6 +7,11 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Primary;
+import org.springframework.security.oauth2.jwt.NimbusReactiveJwtDecoder;
+import org.springframework.security.oauth2.jwt.ReactiveJwtDecoder;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
@@ -28,7 +33,9 @@ import java.time.Instant;
 import java.util.Optional;
 
 /**
- * Kiểm thử bảo mật của API Gateway (Task G1-G3) với token thật ký bằng HS256.
+ * Kiểm thử bảo mật của API Gateway (Task G1-G3) với token có hình dạng như token Keycloak (role trong
+ * realm_access.roles, tên đăng nhập trong preferred_username). Test thay bộ giải mã RS256 của Keycloak bằng một bộ giải
+ * mã HS256 cùng kiểu kiểm tra (chữ ký, hạn dùng), vì không có Keycloak thật trong test.
  *
  * <p>Không cần Eureka hay các service thật: member-service và notification-service được thay bằng một HTTP server giả
  * (đăng ký qua spring.cloud.discovery.client.simple), server này trả lại các header nó nhận được để test kiểm tra
@@ -38,10 +45,21 @@ import java.util.Optional;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
         "eureka.client.enabled=false",
         "app.security.enabled=true",
-        "app.security.jwt.secret=" + GatewaySecurityTest.SECRET,
+        "app.security.jwt.jwk-set-uri=http://localhost:1/never-called",
+        "app.security.jwt.issuer-uri=http://localhost:8180/realms/library",
         "app.cors.allowed-origins=http://localhost:5173"
 })
 class GatewaySecurityTest {
+
+    @TestConfiguration
+    static class TestDecoder {
+        @Bean
+        @Primary
+        ReactiveJwtDecoder testDecoder() {
+            return NimbusReactiveJwtDecoder.withSecretKey(new SecretKeySpec(SECRET.getBytes(StandardCharsets.UTF_8), "HmacSHA256"))
+                    .macAlgorithm(MacAlgorithm.HS256).build();
+        }
+    }
 
     static final String SECRET = "test-secret-for-gateway-security-tests-0123456789";
 
@@ -92,8 +110,9 @@ class GatewaySecurityTest {
         var encoder = new NimbusJwtEncoder(new ImmutableSecret<>(
                 new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256")));
         JwtClaimsSet.Builder claims = JwtClaimsSet.builder()
-                .subject(subject)
-                .claim("role", role)
+                .subject("kc-" + subject)
+                .claim("preferred_username", subject)
+                .claim("realm_access", java.util.Map.of("roles", java.util.List.of(role, "offline_access")))
                 .issuedAt(expiresAt.minus(Duration.ofHours(8)))
                 .expiresAt(expiresAt);
         if (memberId != null) {
@@ -206,22 +225,20 @@ class GatewaySecurityTest {
     }
 
     @Test
-    @DisplayName("Cả hai role đều đổi được mật khẩu của chính mình")
-    void bothRolesCanChangePassword() {
+    @DisplayName("Đăng nhập, quên mật khẩu, đổi mật khẩu do Keycloak làm: Gateway không còn nhận các đường dẫn này")
+    void loginEndpointsAreGone() {
+        client.post().uri("/api/auth/login").exchange().expectStatus().isUnauthorized();
+        client.post().uri("/api/auth/forgot-password").exchange().expectStatus().isUnauthorized();
         client.post().uri("/api/auth/password").header(HttpHeaders.AUTHORIZATION, "Bearer " + member())
-                .exchange().expectStatus().isOk()
-                .expectBody().jsonPath("$.role").isEqualTo("MEMBER");
-        client.post().uri("/api/auth/password").header(HttpHeaders.AUTHORIZATION, "Bearer " + librarian())
-                .exchange().expectStatus().isOk()
-                .expectBody().jsonPath("$.role").isEqualTo("LIBRARIAN");
+                .exchange().expectStatus().isForbidden(); // đã đăng nhập nhưng không phải thủ thư
     }
 
     // ===================== Public routes & routing =====================
 
     @Test
-    @DisplayName("Đăng nhập không cần token, và header danh tính giả mạo bị xóa")
-    void loginIsPublicAndSpoofedHeadersAreRemoved() {
-        client.post().uri("/api/auth/login")
+    @DisplayName("Đăng ký không cần token, và header danh tính giả mạo bị xóa")
+    void registerIsPublicAndSpoofedHeadersAreRemoved() {
+        client.post().uri("/api/auth/register")
                 .header("X-User-Role", "LIBRARIAN")    // cố tình giả mạo
                 .header("X-Username", "TT-0001")
                 .exchange()

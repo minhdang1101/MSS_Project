@@ -12,7 +12,6 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-import java.time.Instant;
 import java.time.LocalDate;
 
 @Getter
@@ -45,22 +44,4 @@ public class Member extends BaseEntity {
     @Column(name = "joined_at", nullable = false)
     private LocalDate joinedAt;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20, columnDefinition = "varchar(20) not null default 'MEMBER'")
-    private MemberRole role = MemberRole.MEMBER;
-
-    @Column(name = "reset_code_hash", length = 100)
-    private String resetCodeHash;
-
-    @Column(name = "reset_code_expires_at")
-    private Instant resetCodeExpiresAt;
-
-    @Column(name = "reset_code_attempts", nullable = false, columnDefinition = "integer not null default 0")
-    private int resetCodeAttempts;
-
-    @Column(name = "reset_code_sent_at")
-    private Instant resetCodeSentAt;
-
-    @Column(name = "password_hash", length = 100)
-    private String passwordHash;
 }
