@@ -1,7 +1,7 @@
 import { formatCurrency } from '../../utils/format.js'
 
 /** The rules behind every amount in the list, read from the policy in effect today. */
-export default function FinePolicyPanel({ policy }) {
+export default function FinePolicyPanel({ policy, onEdit }) {
   return (
     <aside className="panel policy" aria-labelledby="policy-title">
       <h2 id="policy-title">Cách tính phạt</h2>
@@ -21,6 +21,7 @@ export default function FinePolicyPanel({ policy }) {
       <p className="policy-note">
         Ngày trễ được đếm từ hạn trả đến ngày nhận lại sách. Tiền phạt = (số ngày trễ - ngày ân hạn) x mức phạt mỗi ngày, không quá mức trần.
       </p>
+      {policy && <button type="button" className="btn primary" onClick={onEdit}>Sửa chính sách</button>}
     </aside>
   )
 }

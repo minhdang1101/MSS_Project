@@ -9,6 +9,7 @@ import StatusBadge from '../../components/StatusBadge.jsx'
 import Toast from '../../components/Toast.jsx'
 import useFetch from '../../hooks/useFetch.js'
 import { formatCurrency } from '../../utils/format.js'
+import FinePolicyDialog from './FinePolicyDialog.jsx'
 import FinePolicyPanel from './FinePolicyPanel.jsx'
 import FineSettleDialog from './FineSettleDialog.jsx'
 
@@ -35,11 +36,18 @@ const fetchFines = async () => {
 export default function FineListPage() {
   const { data, loading, error, reload } = useFetch(fetchFines)
   const [settling, setSettling] = useState(null) // the UNPAID fine being collected
+  const [editingPolicy, setEditingPolicy] = useState(false)
   const [notice, setNotice] = useState(null)
   const clearNotice = useCallback(() => setNotice(null), [])
 
   const handleSettled = (text) => {
     setSettling(null)
+    setNotice({ text, kind: 'ok' })
+    reload()
+  }
+
+  const handlePolicySaved = (text) => {
+    setEditingPolicy(false)
     setNotice({ text, kind: 'ok' })
     reload()
   }
@@ -75,11 +83,14 @@ export default function FineListPage() {
       <PageState loading={loading} error={error}>
         <div className="fines">
           <DataTable columns={columns} rows={data?.fines} emptyText="Chưa có khoản phạt nào." />
-          <FinePolicyPanel policy={data?.policy} />
+          <FinePolicyPanel policy={data?.policy} onEdit={() => setEditingPolicy(true)} />
         </div>
       </PageState>
 
       {settling && <FineSettleDialog fine={settling} onClose={() => setSettling(null)} onSettled={handleSettled} />}
+      {editingPolicy && (
+        <FinePolicyDialog policy={data?.policy} onClose={() => setEditingPolicy(false)} onSaved={handlePolicySaved} />
+      )}
       <Toast notice={notice} onDone={clearNotice} />
     </section>
   )
