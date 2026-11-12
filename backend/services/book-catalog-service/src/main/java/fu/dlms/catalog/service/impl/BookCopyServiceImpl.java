@@ -38,12 +38,12 @@ public class BookCopyServiceImpl implements BookCopyService {
         if(book.getStatus() == BookStatus.ARCHIVED){
             throw new BusinessException("This Book Deleted");
         }
-        if(bookCopyRepository.existsByBarcode(request.barcode())){
+        if(bookCopyRepository.existsByBarcode(request.barcode().trim())){
             throw new BusinessException("Barcode Exist !!!!!!!");
         }
         BookCopy bookCopy = new BookCopy();
         bookCopy.setBook(book);
-        bookCopy.setBarcode(request.barcode());
+        bookCopy.setBarcode(request.barcode().trim());
         bookCopy.setShelfLocation(request.shelfLocation());
 
         book.setAvailableCopies(book.getAvailableCopies()+1);
@@ -85,7 +85,7 @@ public class BookCopyServiceImpl implements BookCopyService {
             book.setAvailableCopies(book.getAvailableCopies() + 1);
         }
 
-        copy.setBarcode(request.barcode());
+        copy.setBarcode(request.barcode().trim());
         copy.setShelfLocation(request.shelfLocation());
         copy.setStatus(request.status());
 

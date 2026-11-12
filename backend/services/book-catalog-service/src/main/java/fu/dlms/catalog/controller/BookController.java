@@ -49,5 +49,5 @@ public class BookController {
         return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
     }
 
-    // TODO: POST /{id}/reservations  - called by loan-service to check & reserve availability
+
 }

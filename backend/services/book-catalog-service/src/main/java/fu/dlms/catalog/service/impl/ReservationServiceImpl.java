@@ -116,6 +116,9 @@ public class ReservationServiceImpl implements ReservationService {
     }
 
     private void putBack(Book book, BookCopy copy) {
+        if(book.getFormat() == BookFormat.PHYSICAL && copy == null){
+            throw new BusinessException("không tìm thấy cuốn sách này");
+        }
         if (copy != null) {
             copy.setStatus(CopyStatus.AVAILABLE);
         }
