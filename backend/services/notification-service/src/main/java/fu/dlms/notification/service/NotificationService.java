@@ -1,6 +1,6 @@
 package fu.dlms.notification.service;
 
-import fu.dlms.notification.dto.NotificationResponse;
+import fu.dlms.notification.dto.res.NotificationResponse;
 import fu.dlms.notification.entity.NotificationStatus;
 import fu.dlms.notification.entity.NotificationType;
 import fu.dlms.notification.messaging.LoanEvent;

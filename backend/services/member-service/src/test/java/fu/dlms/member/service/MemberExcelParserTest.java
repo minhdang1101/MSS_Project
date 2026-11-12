@@ -1,6 +1,6 @@
 package fu.dlms.member.service;
 
-import fu.dlms.member.dto.MemberImportRow;
+import fu.dlms.member.dto.req.MemberImportRow;
 import fu.dlms.member.exception.InvalidFileException;
 import fu.dlms.member.service.impl.MemberExcelParser;
 import org.apache.poi.hssf.usermodel.HSSFWorkbook;

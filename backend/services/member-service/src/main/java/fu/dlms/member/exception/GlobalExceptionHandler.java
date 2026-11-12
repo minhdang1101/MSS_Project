@@ -1,6 +1,6 @@
 package fu.dlms.member.exception;
 
-import fu.dlms.member.dto.ApiError;
+import fu.dlms.member.dto.res.ApiError;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.NestedExceptionUtils;

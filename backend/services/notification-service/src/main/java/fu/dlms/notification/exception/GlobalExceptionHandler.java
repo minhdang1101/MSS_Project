@@ -1,6 +1,6 @@
 package fu.dlms.notification.exception;
 
-import fu.dlms.notification.dto.ApiError;
+import fu.dlms.notification.dto.res.ApiError;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;

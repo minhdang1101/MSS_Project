@@ -1,7 +1,7 @@
 package fu.dlms.fine.service.impl;
 
-import fu.dlms.fine.dto.FinePolicyRequest;
-import fu.dlms.fine.dto.FinePolicyResponse;
+import fu.dlms.fine.dto.req.FinePolicyRequest;
+import fu.dlms.fine.dto.res.FinePolicyResponse;
 import fu.dlms.fine.entity.FinePolicy;
 import fu.dlms.fine.exception.ResourceNotFoundException;
 import fu.dlms.fine.repository.FinePolicyRepository;

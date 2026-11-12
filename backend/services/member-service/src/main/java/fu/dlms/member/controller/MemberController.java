@@ -1,9 +1,9 @@
 package fu.dlms.member.controller;
 
-import fu.dlms.member.dto.MemberImportResult;
-import fu.dlms.member.dto.MemberRequest;
-import fu.dlms.member.dto.MemberResponse;
-import fu.dlms.member.dto.MemberStatusRequest;
+import fu.dlms.member.dto.res.MemberImportResult;
+import fu.dlms.member.dto.req.MemberRequest;
+import fu.dlms.member.dto.res.MemberResponse;
+import fu.dlms.member.dto.req.MemberStatusRequest;
 import fu.dlms.member.exception.InvalidFileException;
 import fu.dlms.member.service.MemberService;
 import jakarta.validation.Valid;

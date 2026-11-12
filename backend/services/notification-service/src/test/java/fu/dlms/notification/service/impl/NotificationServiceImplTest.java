@@ -1,6 +1,6 @@
 package fu.dlms.notification.service.impl;
 
-import fu.dlms.notification.dto.NotificationResponse;
+import fu.dlms.notification.dto.res.NotificationResponse;
 import fu.dlms.notification.entity.Notification;
 import fu.dlms.notification.entity.NotificationChannel;
 import fu.dlms.notification.entity.NotificationStatus;

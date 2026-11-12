@@ -1,7 +1,7 @@
 package fu.dlms.member.repository;
 
-import fu.dlms.member.dto.MemberRequest;
-import fu.dlms.member.dto.MemberResponse;
+import fu.dlms.member.dto.req.MemberRequest;
+import fu.dlms.member.dto.res.MemberResponse;
 import fu.dlms.member.entity.Member;
 import fu.dlms.member.security.PasswordGenerator;
 import fu.dlms.member.service.impl.CardNumberGenerator;

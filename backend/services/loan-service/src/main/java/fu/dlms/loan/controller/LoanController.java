@@ -1,7 +1,7 @@
 package fu.dlms.loan.controller;
 
-import fu.dlms.loan.dto.BorrowRequest;
-import fu.dlms.loan.dto.LoanResponse;
+import fu.dlms.loan.dto.req.BorrowRequest;
+import fu.dlms.loan.dto.res.LoanResponse;
 import fu.dlms.loan.entity.LoanStatus;
 import fu.dlms.loan.service.LoanService;
 import jakarta.validation.Valid;
