@@ -56,6 +56,7 @@ public class NotificationDelivery {
 
         Instant now = clock.instant();
         notification.setAttempts(notification.getAttempts() + 1);
+        ///Tăng số lần thử gửi
         try {
             sender.send(notification);
             notification.setStatus(NotificationStatus.SENT);
@@ -64,6 +65,7 @@ public class NotificationDelivery {
         } catch (RuntimeException e) {
             notification.setLastError(shorten(e.getClass().getSimpleName() + ": " + e.getMessage()));
             if (notification.getAttempts() >= Notification.MAX_ATTEMPTS) {
+                //nếu không còn lượt thử gửi nữa thì chuyển sang trạng thái FAILED, không thử lại nữa
                 notification.setStatus(NotificationStatus.FAILED);
                 log.warn("Notification {} FAILED after {} attempts: {}", id, notification.getAttempts(), e.getMessage());
             } else {
