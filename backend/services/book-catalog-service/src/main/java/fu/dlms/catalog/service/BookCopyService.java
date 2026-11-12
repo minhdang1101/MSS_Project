@@ -1,8 +1,8 @@
 package fu.dlms.catalog.service;
 
-import fu.dlms.catalog.dto.BookCopyRequest;
-import fu.dlms.catalog.dto.BookCopyResponse;
-import fu.dlms.catalog.dto.BookCopyUpdateRequest;
+import fu.dlms.catalog.dto.req.BookCopyRequest;
+import fu.dlms.catalog.dto.res.BookCopyResponse;
+import fu.dlms.catalog.dto.req.BookCopyUpdateRequest;
 
 import java.util.List;
 

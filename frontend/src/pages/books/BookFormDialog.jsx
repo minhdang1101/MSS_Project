@@ -1,12 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import bookApi from '../../api/bookApi.js'
 import Modal from '../../components/Modal.jsx'
 import Spinner from '../../components/Spinner.jsx'
 
-const MAX_COVER_BYTES = 1024 * 1024
-const COVER_TYPES = ['image/jpeg', 'image/png']
-
-// The ISBN is typed with or without hyphens or spaces; it is kept as its 13 digits.
 const digitsOf = (value) => value.replace(/[\s-]/g, '')
 
 function validate(form) {
@@ -26,43 +22,33 @@ function validate(form) {
       errors.publicationYear = year > new Date().getFullYear() ? 'Năm xuất bản không được ở tương lai' : 'Năm không hợp lệ'
     }
   }
-  const copies = Number(form.totalCopies)
-  if (form.totalCopies === '' || !Number.isInteger(copies) || copies < 1 || copies > 999) errors.totalCopies = 'Nhập số từ 1 đến 999'
+  if (form.format === 'DIGITAL') {
+    const copies = Number(form.totalCopies)
+    if (form.totalCopies === '' || !Number.isInteger(copies) || copies < 1 || copies > 999) errors.totalCopies = 'Nhập số từ 1 đến 999'
+  }
   return errors
 }
 
-/** Adds a book to the catalogue, with an optional cover picture. */
-export default function BookFormDialog({ onClose, onSaved }) {
-  const [form, setForm] = useState({
-    isbn: '', title: '', author: '', publisher: '', publicationYear: '', format: 'PHYSICAL', totalCopies: '1', shelfLocation: '',
-  })
-  const [cover, setCover] = useState(null)
-  const [preview, setPreview] = useState(null)
-  const [coverError, setCoverError] = useState(null)
+const initialForm = (book) => ({
+  isbn: book?.isbn ?? '',
+  title: book?.title ?? '',
+  author: book?.author ?? '',
+  publisher: book?.publisher ?? '',
+  publicationYear: book?.publicationYear == null ? '' : String(book.publicationYear),
+  format: book?.format ?? 'PHYSICAL',
+  totalCopies: book ? String(book.totalCopies) : '1',
+})
+
+export default function BookFormDialog({ book, onClose, onSaved }) {
+  const editing = Boolean(book)
+  const [form, setForm] = useState(() => initialForm(book))
   const [fieldErrors, setFieldErrors] = useState({})
   const [error, setError] = useState(null)
   const [saving, setSaving] = useState(false)
 
-  useEffect(() => {
-    if (!cover) return undefined
-    const url = URL.createObjectURL(cover)
-    setPreview(url)
-    return () => URL.revokeObjectURL(url)
-  }, [cover])
-
   const set = (key) => (e) => {
     setForm((f) => ({ ...f, [key]: e.target.value }))
     if (fieldErrors[key]) setFieldErrors((errs) => ({ ...errs, [key]: undefined }))
-  }
-
-  const pickCover = (e) => {
-    const file = e.target.files?.[0]
-    e.target.value = ''
-    if (!file) return
-    if (!COVER_TYPES.includes(file.type)) return setCoverError('Chỉ nhận ảnh JPG hoặc PNG.')
-    if (file.size > MAX_COVER_BYTES) return setCoverError('Ảnh quá lớn (tối đa 1MB).')
-    setCoverError(null)
-    setCover(file)
   }
 
   const handleSubmit = async (e) => {
@@ -75,34 +61,23 @@ export default function BookFormDialog({ onClose, onSaved }) {
     }
     setSaving(true)
     setError(null)
-    let created
+    const data = {
+      isbn: digitsOf(form.isbn),
+      title: form.title.trim(),
+      author: form.author.trim(),
+      publisher: form.publisher.trim() || null,
+      publicationYear: form.publicationYear === '' ? null : Number(form.publicationYear),
+      format: form.format,
+      totalCopies: form.format === 'DIGITAL' ? Number(form.totalCopies) : 0,
+    }
     try {
-      created = await bookApi.create({
-        isbn: digitsOf(form.isbn),
-        title: form.title.trim(),
-        author: form.author.trim(),
-        publisher: form.publisher.trim() || null,
-        publicationYear: form.publicationYear === '' ? null : Number(form.publicationYear),
-        format: form.format,
-        totalCopies: Number(form.totalCopies),
-        shelfLocation: form.format === 'PHYSICAL' ? form.shelfLocation.trim() || null : null,
-      })
+      const saved = editing ? await bookApi.update(book.id, data) : await bookApi.create(data)
+      onSaved(editing ? `Đã cập nhật sách "${saved.title}".` : `Đã thêm sách "${saved.title}".`, 'ok')
     } catch (err) {
       setFieldErrors(err.fieldErrors ?? {})
       setError(err.fieldErrors ? 'Kiểm tra lại các ô được đánh dấu.' : (err.message ?? 'Không lưu được. Thử lại.'))
       setSaving(false)
-      return
     }
-    // The book exists now; a failed picture must not make the librarian add it a second time.
-    if (cover) {
-      try {
-        await bookApi.uploadCover(created.id, cover)
-      } catch (err) {
-        onSaved(`Đã thêm "${created.title}" nhưng chưa lưu được ảnh bìa: ${err.message ?? 'lỗi không rõ'}`, 'error')
-        return
-      }
-    }
-    onSaved(`Đã thêm sách "${created.title}".`, 'ok')
   }
 
   const field = (key, label, input = {}) => (
@@ -115,7 +90,7 @@ export default function BookFormDialog({ onClose, onSaved }) {
   )
 
   return (
-    <Modal title="Thêm sách mới" onClose={onClose} wide>
+    <Modal title={editing ? 'Sửa thông tin sách' : 'Thêm sách mới'} onClose={onClose} wide>
       <form onSubmit={handleSubmit} noValidate>
         <div className="form-grid">
           {field('title', 'Tên sách', { wide: true, attrs: { maxLength: 255, autoFocus: true } })}
@@ -125,29 +100,28 @@ export default function BookFormDialog({ onClose, onSaved }) {
           {field('publicationYear', 'Năm xuất bản', { attrs: { inputMode: 'numeric', maxLength: 4, placeholder: String(new Date().getFullYear()) } })}
           <div className="field">
             <label htmlFor="b-format">Định dạng</label>
-            <select id="b-format" value={form.format} onChange={set('format')}>
+            <select id="b-format" value={form.format} onChange={set('format')} disabled={editing}>
               <option value="PHYSICAL">Sách in</option>
               <option value="DIGITAL">Sách điện tử</option>
             </select>
           </div>
-          {field('totalCopies', form.format === 'DIGITAL' ? 'Số giấy phép' : 'Số bản', { attrs: { inputMode: 'numeric', maxLength: 3 } })}
-          {form.format === 'PHYSICAL' && field('shelfLocation', 'Vị trí kệ (ví dụ A1-01)', { attrs: { maxLength: 50 } })}
-          <div className="field wide">
-            <label htmlFor="b-cover">Ảnh bìa (không bắt buộc)</label>
-            <div className="cover-pick">
-              {preview && <img className="cover-preview" src={preview} alt="Ảnh bìa đã chọn" />}
-              <input id="b-cover" type="file" accept="image/jpeg,image/png" onChange={pickCover} />
-              {cover && <button type="button" className="link-btn" onClick={() => { setCover(null); setPreview(null) }}>Bỏ ảnh</button>}
-            </div>
-            <span className="meta">JPG hoặc PNG, tối đa 1MB.</span>
-            {coverError && <span className="err">{coverError}</span>}
-          </div>
+          {form.format === 'DIGITAL'
+            ? field('totalCopies', 'Số giấy phép', { attrs: { inputMode: 'numeric', maxLength: 3 } })
+            : (
+              <div className="field">
+                <label>Số bản</label>
+                <span className="meta">
+                  {editing ? `${book.availableCopies} / ${book.totalCopies} bản. Quản lý ở nút "Bản sách".`
+                    : 'Thêm từng bản kèm mã vạch và vị trí kệ sau khi tạo sách.'}
+                </span>
+              </div>
+            )}
         </div>
         {error && <p className="err" role="alert">{error}</p>}
         <div className="modal-actions">
           <button type="button" className="btn" onClick={onClose}>Huỷ</button>
           <button type="submit" className="btn primary" disabled={saving}>{saving && <Spinner />}
-            {saving ? 'Đang lưu...' : 'Thêm sách'}</button>
+            {saving ? 'Đang lưu...' : editing ? 'Lưu thay đổi' : 'Thêm sách'}</button>
         </div>
       </form>
     </Modal>

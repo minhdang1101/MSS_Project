@@ -1,7 +1,7 @@
 package fu.dlms.catalog.service.impl;
 
-import fu.dlms.catalog.dto.ReservationRequest;
-import fu.dlms.catalog.dto.ReservationResponse;
+import fu.dlms.catalog.dto.req.ReservationRequest;
+import fu.dlms.catalog.dto.res.ReservationResponse;
 import fu.dlms.catalog.entity.Book;
 import fu.dlms.catalog.entity.BookCopy;
 import fu.dlms.catalog.entity.BookFormat;
@@ -11,6 +11,7 @@ import fu.dlms.catalog.entity.ProcessedEvent;
 import fu.dlms.catalog.entity.Reservation;
 import fu.dlms.catalog.entity.ReservationStatus;
 import fu.dlms.catalog.exception.BusinessException;
+import fu.dlms.catalog.exception.FieldValidationException;
 import fu.dlms.catalog.exception.ResourceNotFoundException;
 import fu.dlms.catalog.messaging.LoanEvent;
 import fu.dlms.catalog.repository.BookCopyRepository;
@@ -22,9 +23,11 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Optional;
 
 @Slf4j
 @Service
@@ -42,9 +45,9 @@ public class ReservationServiceImpl implements ReservationService {
     @Override
     @Transactional
     public ReservationResponse reserve(Long bookId, ReservationRequest request) {
-        var existing = reservationRepository.findByRequestKey(request.requestKey());
+        Optional<Reservation> existing = reservationRepository.findByRequestKey(request.requestKey());
         if (existing.isPresent()) {
-            return ReservationResponse.from(existing.get()); // a retry gets the same hold, never a second copy
+            return ReservationResponse.from(existing.get());
         }
         Book book = bookRepository.findById(bookId).orElseThrow(() -> new ResourceNotFoundException("Book", bookId));
         if (book.getStatus() == BookStatus.ARCHIVED) {
@@ -56,11 +59,19 @@ public class ReservationServiceImpl implements ReservationService {
 
         BookCopy copy = null;
         if (book.getFormat() == BookFormat.PHYSICAL) {
-            copy = copyRepository.findFirstByBookIdAndStatus(bookId, CopyStatus.AVAILABLE)
-                    .orElseThrow(() -> new BusinessException("Sách \"" + book.getTitle() + "\" không còn bản nào trên kệ."));
+            if(request.barcode() == null || request.barcode().isBlank()){
+                throw new FieldValidationException("barcode", "Sách vật lý phải quét barcode") ;
+            }
+            copy = copyRepository.findByBarcode(request.barcode().trim()).orElseThrow(() -> new ResourceNotFoundException("Book Copy", request.barcode()));
+            if(!copy.getBook().getId().equals(bookId)){
+                throw new BusinessException(request.barcode() + " không khớp với Book ID: " + bookId);
+            }
+            if(!(copy.getStatus() == CopyStatus.AVAILABLE)){
+                throw new BusinessException("Cuốn sách này hiện không khả dụng");
+            }
             copy.setStatus(CopyStatus.ON_LOAN);
         }
-        book.setAvailableCopies(book.getAvailableCopies() - 1); // @Version: a concurrent borrow loses here, see the 409 handler
+        book.setAvailableCopies(book.getAvailableCopies() - 1);
         book.refreshStatus();
 
         Reservation reservation = new Reservation();
@@ -82,6 +93,9 @@ public class ReservationServiceImpl implements ReservationService {
                     r.setStatus(ReservationStatus.RELEASED);
                     log.info("Reservation {} released", requestKey);
                 });
+
+        reservationRepository.findByRequestKey(requestKey);
+
     }
 
     @Override
@@ -101,12 +115,11 @@ public class ReservationServiceImpl implements ReservationService {
         processedEventRepository.save(new ProcessedEvent(key));
     }
 
-    /** The copy goes back on the shelf; the count never exceeds the number of copies the library owns. */
     private void putBack(Book book, BookCopy copy) {
         if (copy != null) {
             copy.setStatus(CopyStatus.AVAILABLE);
         }
-        book.setAvailableCopies(Math.min(book.getTotalCopies(), book.getAvailableCopies() + 1));
+        book.setAvailableCopies(book.getAvailableCopies() + 1);
         book.refreshStatus();
     }
 }

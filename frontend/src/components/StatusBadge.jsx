@@ -1,15 +1,16 @@
 const TONE = {
   ok: ['ACTIVE', 'AVAILABLE', 'PAID', 'SENT', 'RETURNED', 'BORROWED'],
   late: ['OVERDUE', 'ACCRUING', 'FAILED', 'SUSPENDED', 'LOCKED', 'LOST', 'DAMAGED'],
-  soon: ['PENDING', 'RESERVED', 'ON_LOAN', 'UNPAID'],
+  soon: ['PENDING', 'RESERVED', 'ON_LOAN', 'UNPAID', 'DUE_SOON'],
 }
 
 const LABEL = {
   ACTIVE: 'Hoạt động', SUSPENDED: 'Tạm khoá', LOCKED: 'Đã khoá',
   AVAILABLE: 'Sẵn có', UNAVAILABLE: 'Không sẵn có', ARCHIVED: 'Lưu trữ',
+  ON_LOAN: 'Đang cho mượn', LOST: 'Mất', DAMAGED: 'Hỏng',
   BORROWED: 'Đang mượn', OVERDUE: 'Quá hạn', RETURNED: 'Đã trả',
   ACCRUING: 'Đang tăng mỗi ngày', UNPAID: 'Chưa thu', PAID: 'Đã thu', WAIVED: 'Miễn phạt',
-  PENDING: 'Chờ gửi', SENT: 'Đã gửi', FAILED: 'Gửi lỗi',
+  PENDING: 'Chờ gửi', SENT: 'Đã gửi', FAILED: 'Gửi lỗi', DUE_SOON: 'Sắp đến hạn',
 }
 
 const toneOf = (status) => Object.keys(TONE).find((t) => TONE[t].includes(status)) ?? 'none'

@@ -1,11 +1,11 @@
 package fu.dlms.member.service;
 
-import fu.dlms.member.dto.ForgotPasswordRequest;
-import fu.dlms.member.dto.LoginRequest;
-import fu.dlms.member.dto.MemberResponse;
-import fu.dlms.member.dto.RegisterRequest;
-import fu.dlms.member.dto.ResetPasswordRequest;
-import fu.dlms.member.dto.VerifyResetCodeRequest;
+import fu.dlms.member.dto.req.ForgotPasswordRequest;
+import fu.dlms.member.dto.req.LoginRequest;
+import fu.dlms.member.dto.res.MemberResponse;
+import fu.dlms.member.dto.req.RegisterRequest;
+import fu.dlms.member.dto.req.ResetPasswordRequest;
+import fu.dlms.member.dto.req.VerifyResetCodeRequest;
 import fu.dlms.member.entity.Member;
 import fu.dlms.member.entity.MemberStatus;
 import fu.dlms.member.exception.BusinessException;

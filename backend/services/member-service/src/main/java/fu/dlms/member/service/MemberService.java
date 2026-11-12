@@ -1,8 +1,8 @@
 package fu.dlms.member.service;
 
-import fu.dlms.member.dto.MemberImportResult;
-import fu.dlms.member.dto.MemberRequest;
-import fu.dlms.member.dto.MemberResponse;
+import fu.dlms.member.dto.res.MemberImportResult;
+import fu.dlms.member.dto.req.MemberRequest;
+import fu.dlms.member.dto.res.MemberResponse;
 import fu.dlms.member.entity.MemberStatus;
 
 import java.io.InputStream;

@@ -22,5 +22,6 @@ export default function useFetch(fetcher) {
     load()
   }, [load])
 
-  return { data, loading, error, reload: load }
+  // setData lets a page update what it shows right away (e.g. mark as read) without reloading everything
+  return { data, loading, error, reload: load, setData }
 }

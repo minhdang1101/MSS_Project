@@ -27,3 +27,22 @@ spring.rabbitmq.host=localhost
 spring.rabbitmq.port=5672
 spring.rabbitmq.username=your_rabbitmq_username
 spring.rabbitmq.password=your_rabbitmq_password
+
+# ===== OpenFeign: gọi member-service lấy email (N4) =====
+# Chờ tối đa bao lâu; quá thời gian thì thông báo chuyển sang kênh IN_APP thay vì treo consumer
+spring.cloud.openfeign.client.config.member-service.connect-timeout=2000
+spring.cloud.openfeign.client.config.member-service.read-timeout=3000
+
+# ===== Gửi thông báo (N5) =====
+# Quét thông báo PENDING mỗi 60 giây; gửi lỗi thì thử lại sau 1, 2 phút; lỗi lần 3 thì FAILED
+app.notification.dispatch-interval-ms=60000
+app.notification.retry-delay-ms=60000
+# false: email chỉ ghi log (chạy từ IDE không cần mail server). true: gửi thật qua spring.mail.* (Docker dùng Mailpit)
+app.notification.mail.enabled=false
+app.notification.mail.from=thuvien@dlms.local
+#spring.mail.host=localhost
+#spring.mail.port=1025
+
+# ===== RabbitMQ listener (N6) =====
+# Thử xử lý một message tối đa 3 lần (chờ 1s, 2s) rồi chuyển vào notification.loan-reminders.dlq
+app.notification.listener.max-attempts=3

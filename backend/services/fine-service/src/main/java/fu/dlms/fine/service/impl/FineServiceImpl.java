@@ -1,6 +1,6 @@
 package fu.dlms.fine.service.impl;
 
-import fu.dlms.fine.dto.FineResponse;
+import fu.dlms.fine.dto.res.FineResponse;
 import fu.dlms.fine.entity.Fine;
 import fu.dlms.fine.entity.FinePolicy;
 import fu.dlms.fine.entity.FineStatus;

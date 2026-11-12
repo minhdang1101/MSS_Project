@@ -1,7 +1,7 @@
 package fu.dlms.catalog.service;
 
-import fu.dlms.catalog.dto.ReservationRequest;
-import fu.dlms.catalog.dto.ReservationResponse;
+import fu.dlms.catalog.dto.req.ReservationRequest;
+import fu.dlms.catalog.dto.res.ReservationResponse;
 import fu.dlms.catalog.messaging.LoanEvent;
 
 public interface ReservationService {

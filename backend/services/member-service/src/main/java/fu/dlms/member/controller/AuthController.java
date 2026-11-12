@@ -1,12 +1,12 @@
 package fu.dlms.member.controller;
 
-import fu.dlms.member.dto.ChangePasswordRequest;
-import fu.dlms.member.dto.ForgotPasswordRequest;
-import fu.dlms.member.dto.RegisterRequest;
-import fu.dlms.member.dto.ResetPasswordRequest;
-import fu.dlms.member.dto.VerifyResetCodeRequest;
-import fu.dlms.member.dto.LoginRequest;
-import fu.dlms.member.dto.LoginResponse;
+import fu.dlms.member.dto.req.ChangePasswordRequest;
+import fu.dlms.member.dto.req.ForgotPasswordRequest;
+import fu.dlms.member.dto.req.RegisterRequest;
+import fu.dlms.member.dto.req.ResetPasswordRequest;
+import fu.dlms.member.dto.req.VerifyResetCodeRequest;
+import fu.dlms.member.dto.req.LoginRequest;
+import fu.dlms.member.dto.res.LoginResponse;
 import fu.dlms.member.service.AuthService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;

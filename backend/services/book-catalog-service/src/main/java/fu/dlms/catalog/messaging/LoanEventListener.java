@@ -4,10 +4,7 @@ import fu.dlms.catalog.config.RabbitMqConfig;
 import fu.dlms.catalog.service.ReservationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.amqp.core.Binding;
-import org.springframework.amqp.core.BindingBuilder;
-import org.springframework.amqp.core.Queue;
-import org.springframework.amqp.core.TopicExchange;
+import org.springframework.amqp.core.*;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -18,11 +15,23 @@ import org.springframework.context.annotation.Configuration;
 public class LoanEventListener {
 
     public static final String QUEUE = "catalog.loan-returned";
+    public static final String DEAD_LETTER_QUEUE = QUEUE + ".dlq";
+
 
     @Bean
     public Queue catalogLoanReturnedQueue() {
-        return new Queue(QUEUE, true);
+        return QueueBuilder.durable(QUEUE)
+                .deadLetterExchange("")
+                .deadLetterRoutingKey(DEAD_LETTER_QUEUE)
+                .build();
     }
+
+    @Bean
+    public Queue catalogLoanReturnedDeadLetterQueue() {
+        return QueueBuilder.durable(DEAD_LETTER_QUEUE)
+                .build();
+    }
+
 
     @Bean
     public Binding catalogLoanReturnedBinding(Queue catalogLoanReturnedQueue, TopicExchange libraryExchange) {

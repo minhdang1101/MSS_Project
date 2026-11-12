@@ -44,7 +44,18 @@ public class RemoteErrorConfig {
         }
         try (InputStream body = response.body().asInputStream()) {
             JsonNode node = objectMapper.readTree(body);
-            JsonNode message = node == null ? null : node.get("message");
+            if (node == null) {
+                return null;
+            }
+            // A validation error says only "Validation failed"; the useful text is in fieldErrors.
+            JsonNode fieldErrors = node.get("fieldErrors");
+            if (fieldErrors != null && fieldErrors.isObject() && fieldErrors.size() > 0) {
+                String first = fieldErrors.elements().next().asText();
+                if (!first.isBlank()) {
+                    return first;
+                }
+            }
+            JsonNode message = node.get("message");
             return message == null || message.isNull() || message.asText().isBlank() ? null : message.asText();
         } catch (IOException | RuntimeException e) {
             return null; // not JSON (e.g. an HTML error page): fall back to the generic message

@@ -1,6 +1,6 @@
 package fu.dlms.loan.controller;
 
-import fu.dlms.loan.dto.LoanResponse;
+import fu.dlms.loan.dto.res.LoanResponse;
 import fu.dlms.loan.service.LoanService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;

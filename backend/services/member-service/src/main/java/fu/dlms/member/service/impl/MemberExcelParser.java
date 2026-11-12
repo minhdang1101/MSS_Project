@@ -1,6 +1,6 @@
 package fu.dlms.member.service.impl;
 
-import fu.dlms.member.dto.MemberImportRow;
+import fu.dlms.member.dto.req.MemberImportRow;
 import fu.dlms.member.exception.InvalidFileException;
 import org.apache.poi.openxml4j.util.ZipSecureFile;
 import org.apache.poi.ss.usermodel.Cell;

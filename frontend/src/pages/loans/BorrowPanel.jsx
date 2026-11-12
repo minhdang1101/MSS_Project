@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import bookApi from '../../api/bookApi.js'
 import loanApi from '../../api/loanApi.js'
 import StatusBadge from '../../components/StatusBadge.jsx'
 import { formatDate } from '../../utils/format.js'
@@ -11,11 +12,31 @@ const findMember = (members, text) => {
   return q ? members.find((m) => [m.libraryCardNo, m.email, m.fullName].some((v) => norm(v) === q)) : null
 }
 
-// The barcode scanner types the ISBN; picking a title from the suggestions works too.
 const findBook = (books, text) => {
   const q = norm(text)
   return q ? books.find((b) => norm(b.isbn) === q || norm(b.title) === q) : null
 }
+
+const COPY_STATUS = {
+  AVAILABLE: 'trên kệ', ON_LOAN: 'đang cho mượn', RESERVED: 'đang giữ chỗ', LOST: 'đã mất', DAMAGED: 'hỏng',
+}
+
+// Every copy of every printed book, for the suggestions under the book field. Copies on the shelf come first.
+// A book whose copies cannot be loaded is left out; scanning its barcode still works.
+const fetchCopies = async (books) => {
+  const printed = books.filter((b) => b.format === 'PHYSICAL')
+  const results = await Promise.allSettled(printed.map((b) => bookApi.getCopies(b.id)))
+  const titleById = new Map(printed.map((b) => [b.id, b.title]))
+  return results
+    .flatMap((r) => (r.status === 'fulfilled' ? r.value : []))
+    .map((c) => ({ ...c, title: titleById.get(c.bookId) ?? `Sách #${c.bookId}` }))
+    .sort((a, b) => (a.status === 'AVAILABLE' ? 0 : 1) - (b.status === 'AVAILABLE' ? 0 : 1)
+      || a.barcode.localeCompare(b.barcode))
+}
+
+const copyLabel = (c) =>
+  [c.title, c.shelfLocation ? `kệ ${c.shelfLocation}` : null, COPY_STATUS[c.status] ?? c.status]
+    .filter(Boolean).join(' · ')
 
 const initials = (name) => name.split(/\s+/).filter(Boolean).slice(-2).map((w) => w[0]).join('').toUpperCase()
 
@@ -31,7 +52,43 @@ export default function BorrowPanel({ members, books, loans, onSelect, onBorrowe
   const keyRef = useRef(crypto.randomUUID())
 
   const member = useMemo(() => findMember(members, memberText), [members, memberText])
-  const book = useMemo(() => findBook(books, bookText), [books, bookText])
+  const matched = useMemo(() => findBook(books, bookText), [books, bookText])
+  const [copy, setCopy] = useState(null)
+  const [lookingUp, setLookingUp] = useState(false)
+  const [copies, setCopies] = useState([])
+  const digitalBooks = useMemo(() => books.filter((b) => b.format === 'DIGITAL'), [books])
+
+  // Reloaded with the book list (after every borrow or return), so a copy's status in the suggestions stays current.
+  useEffect(() => {
+    let active = true
+    fetchCopies(books).then((list) => { if (active) setCopies(list) }).catch(() => {})
+    return () => { active = false }
+  }, [books])
+
+  useEffect(() => {
+    setCopy(null)
+    const text = bookText.trim()
+    if (!text || matched) return undefined
+    let active = true
+    setLookingUp(true)
+    const timer = setTimeout(async () => {
+      try {
+        const found = await bookApi.findCopyByBarcode(text)
+        if (active) setCopy(found)
+      } catch {
+        if (active) setCopy(null)
+      } finally {
+        if (active) setLookingUp(false)
+      }
+    }, 250)
+    return () => {
+      active = false
+      clearTimeout(timer)
+      setLookingUp(false)
+    }
+  }, [bookText, matched])
+
+  const book = matched ?? (copy ? books.find((b) => b.id === copy.bookId) ?? null : null)
 
   const memberLoans = useMemo(
     () => (member ? loans.filter((l) => l.memberId === member.id && l.status !== 'RETURNED') : []),
@@ -43,16 +100,19 @@ export default function BorrowPanel({ members, books, loans, onSelect, onBorrowe
   // Ids, not objects: a reload after a borrow gives new objects for the same member and book.
   const memberId = member?.id ?? null
   const bookId = book?.id ?? null
+  const copyId = copy?.id ?? null
   useEffect(() => {
     keyRef.current = crypto.randomUUID()
     setError(null)
     onSelect({ memberId, bookId })
-  }, [memberId, bookId, onSelect])
+  }, [memberId, bookId, copyId, onSelect])
 
   const blocker = !member ? 'Chưa xác định thành viên.'
     : member.status !== 'ACTIVE' ? 'Thẻ không ở trạng thái hoạt động nên không thể mượn.'
       : !book ? 'Chưa chọn sách.'
         : book.status === 'ARCHIVED' ? 'Sách đã ngừng cho mượn.'
+          : book.format === 'PHYSICAL' && !copy ? 'Sách in: hãy quét mã vạch dán trên bản sách.'
+            : copy && copy.status !== 'AVAILABLE' ? `Bản sách ${copy.barcode} hiện không sẵn có.`
           : book.availableCopies <= 0 ? 'Sách này hiện không còn bản nào trên kệ.'
             : alreadyHolding ? 'Thành viên đang mượn cuốn này và chưa trả.'
               : null
@@ -63,7 +123,9 @@ export default function BorrowPanel({ members, books, loans, onSelect, onBorrowe
     setBusy(true)
     setError(null)
     try {
-      const loan = await loanApi.borrow({ idempotencyKey: keyRef.current, memberId: member.id, bookId: book.id })
+      const loan = await loanApi.borrow({
+        idempotencyKey: keyRef.current, memberId: member.id, bookId: book.id, barcode: copy?.barcode ?? null,
+      })
       onBorrowed(loan, `Đã cho ${member.fullName} mượn “${book.title}”. Hạn trả ${formatDate(loan.dueAt)}.`)
       setBookText('') // the same member often borrows several books in a row
     } catch (err) {
@@ -99,9 +161,10 @@ export default function BorrowPanel({ members, books, loans, onSelect, onBorrowe
       <div className="field">
         <label htmlFor="borrow-book">Sách</label>
         <input id="borrow-book" list="borrow-book-list" value={bookText} autoComplete="off"
-          onChange={(e) => setBookText(e.target.value)} placeholder="Quét mã ISBN hoặc gõ tên sách" />
+          onChange={(e) => setBookText(e.target.value)} placeholder="Quét mã vạch bản sách, hoặc gõ ISBN, tên sách điện tử" />
         <datalist id="borrow-book-list">
-          {books.map((b) => <option key={b.id} value={b.isbn}>{b.title}</option>)}
+          {copies.map((c) => <option key={`c${c.id}`} value={c.barcode}>{copyLabel(c)}</option>)}
+          {digitalBooks.map((b) => <option key={`d${b.id}`} value={b.isbn}>{`${b.title} · sách số`}</option>)}
         </datalist>
       </div>
 
@@ -110,6 +173,7 @@ export default function BorrowPanel({ members, books, loans, onSelect, onBorrowe
           <div>
             <div className="title">{book.title}</div>
             <div className="meta">{book.author}{book.publicationYear ? ` · ${book.publicationYear}` : ''}</div>
+            {copy && <div className="meta">Mã vạch {copy.barcode}{copy.shelfLocation ? ` · kệ ${copy.shelfLocation}` : ''}</div>}
           </div>
           <div className="right">
             {book.format === 'DIGITAL' && <span className="st digital">Sách số</span>}
@@ -117,7 +181,7 @@ export default function BorrowPanel({ members, books, loans, onSelect, onBorrowe
           </div>
         </div>
       )}
-      {bookText && !book && <p className="note" style={{ margin: '-6px 0 14px' }}>Không tìm thấy sách “{bookText}”.</p>}
+      {bookText && !book && !lookingUp && <p className="note" style={{ margin: '-6px 0 14px' }}>Không tìm thấy sách “{bookText}”.</p>}
 
       {error && <p className="err" role="alert">{error}</p>}
       {!error && member && blocker && <p className="err">{blocker}</p>}

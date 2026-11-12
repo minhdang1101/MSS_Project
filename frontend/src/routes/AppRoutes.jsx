@@ -14,6 +14,7 @@ import NotificationListPage from '../pages/notifications/NotificationListPage.js
 import BookDetailPage from '../pages/reader/BookDetailPage.jsx'
 import DiscoverPage from '../pages/reader/DiscoverPage.jsx'
 import MyFinesPage from '../pages/reader/MyFinesPage.jsx'
+import MyNotificationsPage from '../pages/reader/MyNotificationsPage.jsx'
 import MyLoansPage from '../pages/reader/MyLoansPage.jsx'
 import { LIBRARIAN, MEMBER } from '../utils/roles.js'
 import RequireAuth from './RequireAuth.jsx'
@@ -44,6 +45,7 @@ export default function AppRoutes() {
           <Route path="books/:id" element={<BookDetailPage />} />
           <Route path="loans" element={<MyLoansPage />} />
           <Route path="fines" element={<MyFinesPage />} />
+          <Route path="notifications" element={<MyNotificationsPage />} />
           <Route path="*" element={<Navigate to="/me" replace />} />
         </Route>
       </Route>
