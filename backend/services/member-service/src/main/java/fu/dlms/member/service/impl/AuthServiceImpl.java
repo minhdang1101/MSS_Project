@@ -1,14 +1,14 @@
 package fu.dlms.member.service.impl;
 
-import fu.dlms.member.dto.ChangePasswordRequest;
-import fu.dlms.member.dto.ForgotPasswordRequest;
-import fu.dlms.member.dto.LoginRequest;
-import fu.dlms.member.dto.LoginResponse;
-import fu.dlms.member.dto.MemberRequest;
-import fu.dlms.member.dto.MemberResponse;
-import fu.dlms.member.dto.RegisterRequest;
-import fu.dlms.member.dto.ResetPasswordRequest;
-import fu.dlms.member.dto.VerifyResetCodeRequest;
+import fu.dlms.member.dto.req.ChangePasswordRequest;
+import fu.dlms.member.dto.req.ForgotPasswordRequest;
+import fu.dlms.member.dto.req.LoginRequest;
+import fu.dlms.member.dto.res.LoginResponse;
+import fu.dlms.member.dto.req.MemberRequest;
+import fu.dlms.member.dto.res.MemberResponse;
+import fu.dlms.member.dto.req.RegisterRequest;
+import fu.dlms.member.dto.req.ResetPasswordRequest;
+import fu.dlms.member.dto.req.VerifyResetCodeRequest;
 import fu.dlms.member.entity.Member;
 import fu.dlms.member.entity.MemberRole;
 import fu.dlms.member.entity.MemberStatus;

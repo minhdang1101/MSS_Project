@@ -1,11 +1,11 @@
 package fu.dlms.member.service.impl;
 
-import fu.dlms.member.dto.MemberImportResult;
-import fu.dlms.member.dto.MemberImportResult.IssuedCredential;
-import fu.dlms.member.dto.MemberImportResult.RowError;
-import fu.dlms.member.dto.MemberImportRow;
-import fu.dlms.member.dto.MemberRequest;
-import fu.dlms.member.dto.MemberResponse;
+import fu.dlms.member.dto.res.MemberImportResult;
+import fu.dlms.member.dto.res.MemberImportResult.IssuedCredential;
+import fu.dlms.member.dto.res.MemberImportResult.RowError;
+import fu.dlms.member.dto.req.MemberImportRow;
+import fu.dlms.member.dto.req.MemberRequest;
+import fu.dlms.member.dto.res.MemberResponse;
 import fu.dlms.member.entity.Member;
 import fu.dlms.member.entity.MemberRole;
 import fu.dlms.member.entity.MemberStatus;

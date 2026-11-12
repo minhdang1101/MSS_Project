@@ -1,6 +1,6 @@
 package fu.dlms.fine.service;
 
-import fu.dlms.fine.dto.FineResponse;
+import fu.dlms.fine.dto.res.FineResponse;
 import fu.dlms.fine.entity.FineStatus;
 import fu.dlms.fine.messaging.LoanEvent;
 

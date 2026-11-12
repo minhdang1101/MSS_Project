@@ -1,7 +1,7 @@
 package fu.dlms.catalog.controller;
 
-import fu.dlms.catalog.dto.BookRequest;
-import fu.dlms.catalog.dto.BookResponse;
+import fu.dlms.catalog.dto.req.BookRequest;
+import fu.dlms.catalog.dto.res.BookResponse;
 import fu.dlms.catalog.entity.BookFormat;
 import fu.dlms.catalog.service.BookService;
 import jakarta.validation.Valid;

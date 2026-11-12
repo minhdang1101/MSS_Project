@@ -1,7 +1,7 @@
 package fu.dlms.catalog.service;
 
-import fu.dlms.catalog.dto.BookRequest;
-import fu.dlms.catalog.dto.BookResponse;
+import fu.dlms.catalog.dto.req.BookRequest;
+import fu.dlms.catalog.dto.res.BookResponse;
 import fu.dlms.catalog.entity.BookFormat;
 
 import java.util.List;

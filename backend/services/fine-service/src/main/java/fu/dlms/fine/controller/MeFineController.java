@@ -1,6 +1,6 @@
 package fu.dlms.fine.controller;
 
-import fu.dlms.fine.dto.FineResponse;
+import fu.dlms.fine.dto.res.FineResponse;
 import fu.dlms.fine.service.FineService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;

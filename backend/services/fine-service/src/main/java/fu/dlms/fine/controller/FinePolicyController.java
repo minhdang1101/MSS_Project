@@ -1,7 +1,7 @@
 package fu.dlms.fine.controller;
 
-import fu.dlms.fine.dto.FinePolicyRequest;
-import fu.dlms.fine.dto.FinePolicyResponse;
+import fu.dlms.fine.dto.req.FinePolicyRequest;
+import fu.dlms.fine.dto.res.FinePolicyResponse;
 import fu.dlms.fine.service.FinePolicyService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;

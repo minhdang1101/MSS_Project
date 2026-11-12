@@ -1,6 +1,6 @@
 package fu.dlms.notification.controller;
 
-import fu.dlms.notification.dto.NotificationResponse;
+import fu.dlms.notification.dto.res.NotificationResponse;
 import fu.dlms.notification.entity.NotificationStatus;
 import fu.dlms.notification.service.NotificationService;
 import lombok.RequiredArgsConstructor;

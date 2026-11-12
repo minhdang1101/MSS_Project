@@ -1,6 +1,6 @@
 package fu.dlms.catalog.exception;
 
-import fu.dlms.catalog.dto.ApiError;
+import fu.dlms.catalog.dto.res.ApiError;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;

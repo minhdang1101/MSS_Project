@@ -1,7 +1,7 @@
 package fu.dlms.catalog.controller;
 
-import fu.dlms.catalog.dto.ReservationRequest;
-import fu.dlms.catalog.dto.ReservationResponse;
+import fu.dlms.catalog.dto.req.ReservationRequest;
+import fu.dlms.catalog.dto.res.ReservationResponse;
 import fu.dlms.catalog.service.ReservationService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;

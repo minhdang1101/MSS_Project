@@ -1,8 +1,8 @@
 package fu.dlms.member.service;
 
-import fu.dlms.member.dto.ChangePasswordRequest;
-import fu.dlms.member.dto.LoginRequest;
-import fu.dlms.member.dto.LoginResponse;
+import fu.dlms.member.dto.req.ChangePasswordRequest;
+import fu.dlms.member.dto.req.LoginRequest;
+import fu.dlms.member.dto.res.LoginResponse;
 import fu.dlms.member.entity.Member;
 import fu.dlms.member.entity.MemberRole;
 import fu.dlms.member.entity.MemberStatus;

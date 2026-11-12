@@ -1,7 +1,7 @@
 package fu.dlms.loan.exception;
 
 import feign.FeignException;
-import fu.dlms.loan.dto.ApiError;
+import fu.dlms.loan.dto.res.ApiError;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
