@@ -46,3 +46,6 @@ app.notification.mail.from=thuvien@dlms.local
 # ===== RabbitMQ listener (N6) =====
 # Thử xử lý một message tối đa 3 lần (chờ 1s, 2s) rồi chuyển vào notification.loan-reminders.dlq
 app.notification.listener.max-attempts=3
+
+# Thủ thư nhận email khi một thông báo gửi lỗi hẳn (FAILED). Nhiều địa chỉ cách nhau bằng dấu phẩy; để trống = chỉ ghi log.
+app.notification.alert.librarian-emails=

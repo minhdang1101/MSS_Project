@@ -4,6 +4,7 @@ import fu.dlms.notification.entity.Notification;
 import fu.dlms.notification.entity.NotificationChannel;
 import fu.dlms.notification.entity.NotificationStatus;
 import fu.dlms.notification.repository.NotificationRepository;
+import fu.dlms.notification.sender.LibrarianAlert;
 import fu.dlms.notification.sender.NotificationSender;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -31,6 +32,7 @@ class NotificationDeliveryTest {
 
     private NotificationRepository repository;
     private NotificationSender sender;
+    private LibrarianAlert librarianAlert;
     private NotificationDelivery delivery;
     private Notification notification;
 
@@ -38,7 +40,8 @@ class NotificationDeliveryTest {
     void setUp() {
         repository = mock(NotificationRepository.class);
         sender = mock(NotificationSender.class);
-        delivery = new NotificationDelivery(repository, sender, Clock.fixed(NOW, ZoneOffset.UTC), RETRY_DELAY_MS);
+        librarianAlert = mock(LibrarianAlert.class);
+        delivery = new NotificationDelivery(repository, sender, librarianAlert, Clock.fixed(NOW, ZoneOffset.UTC), RETRY_DELAY_MS);
 
         notification = new Notification();
         notification.setId(1L);
@@ -79,6 +82,25 @@ class NotificationDeliveryTest {
 
         assertThat(delivery.deliver(1L)).isEqualTo(NotificationStatus.FAILED);
         assertThat(notification.getAttempts()).isEqualTo(Notification.MAX_ATTEMPTS);
+        verify(librarianAlert).notificationFailed(notification); // the librarian is told as soon as it is FAILED
+    }
+
+    @Test
+    @DisplayName("Còn lần thử lại (chưa FAILED): chưa báo thủ thư")
+    void librarianIsNotToldWhileRetriesRemain() {
+        doThrow(new MailSendException("SMTP down")).when(sender).send(any());
+
+        assertThat(delivery.deliver(1L)).isEqualTo(NotificationStatus.PENDING);
+
+        verify(librarianAlert, never()).notificationFailed(any());
+    }
+
+    @Test
+    @DisplayName("Gửi thành công: không báo thủ thư")
+    void librarianIsNotToldOnSuccess() {
+        delivery.deliver(1L);
+
+        verify(librarianAlert, never()).notificationFailed(any());
     }
 
     @Test

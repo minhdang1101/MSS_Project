@@ -3,9 +3,9 @@ import { lateDays, stampDate } from './loanDates.js'
 const ROWS = 6
 
 /**
- * The due-date slip glued inside the book: every loan of this book, oldest first, with the due date stamped on
+ * The due-date slip glued inside the book: only the loan being handled now, with the due date stamped on
  * the left and the return date on the right. The loan being handled now is stamped last, with fresh ink.
- * `loans` = this book's loans, `current` = id of the loan just lent or being returned, `fresh` = animate its stamp.
+ * `loans` = just that loan (empty until one is chosen or made), `current` = id of the loan just lent or being returned, `fresh` = animate its stamp.
  */
 export default function DueSlip({ book, member, loans, current, fresh, preview }) {
   if (!book) {

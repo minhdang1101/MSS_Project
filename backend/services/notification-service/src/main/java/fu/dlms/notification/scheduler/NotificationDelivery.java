@@ -3,6 +3,7 @@ package fu.dlms.notification.scheduler;
 import fu.dlms.notification.entity.Notification;
 import fu.dlms.notification.entity.NotificationStatus;
 import fu.dlms.notification.repository.NotificationRepository;
+import fu.dlms.notification.sender.LibrarianAlert;
 import fu.dlms.notification.sender.NotificationSender;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -22,8 +23,8 @@ import java.time.Instant;
  *
  * <p>Quy tắc thử lại: mỗi lần gửi tăng {@code attempts}. Lỗi thì lưu lý do vào {@code lastError} và dời
  * {@code scheduledAt} ra sau (lần 1 chờ 1 x retryDelay, lần 2 chờ 2 x retryDelay...). Đủ
- * {@link Notification#MAX_ATTEMPTS} lần mà vẫn lỗi thì chuyển sang FAILED; thủ thư có thể bấm gửi lại qua
- * POST /api/notifications/{id}/retry.
+ * {@link Notification#MAX_ATTEMPTS} lần mà vẫn lỗi thì chuyển sang FAILED; thủ thư được báo bằng email (LibrarianAlert)
+ * và có thể bấm gửi lại qua POST /api/notifications/{id}/retry.
  */
 @Slf4j
 @Component
@@ -33,13 +34,15 @@ public class NotificationDelivery {
 
     private final NotificationRepository notificationRepository;
     private final NotificationSender sender;
+    private final LibrarianAlert librarianAlert;
     private final Clock clock;
     private final Duration retryDelay;
 
-    public NotificationDelivery(NotificationRepository notificationRepository, NotificationSender sender, Clock clock,
-                                @Value("${app.notification.retry-delay-ms:60000}") long retryDelayMs) {
+    public NotificationDelivery(NotificationRepository notificationRepository, NotificationSender sender, LibrarianAlert librarianAlert,
+                                Clock clock, @Value("${app.notification.retry-delay-ms:60000}") long retryDelayMs) {
         this.notificationRepository = notificationRepository;
         this.sender = sender;
+        this.librarianAlert = librarianAlert;
         this.clock = clock;
         this.retryDelay = Duration.ofMillis(retryDelayMs);
     }
@@ -66,6 +69,7 @@ public class NotificationDelivery {
             if (notification.getAttempts() >= Notification.MAX_ATTEMPTS) {
                 notification.setStatus(NotificationStatus.FAILED);
                 log.warn("Notification {} FAILED after {} attempts: {}", id, notification.getAttempts(), e.getMessage());
+                librarianAlert.notificationFailed(notification); // báo cho thủ thư, không bao giờ ném lỗi
             } else {
                 Instant nextTry = now.plus(retryDelay.multipliedBy(notification.getAttempts()));
                 notification.setScheduledAt(nextTry);

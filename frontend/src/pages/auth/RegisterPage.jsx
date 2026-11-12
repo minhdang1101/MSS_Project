@@ -7,10 +7,13 @@ import { useAuth } from '../../context/AuthContext.jsx'
 import { homeFor } from '../../utils/roles.js'
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/
+const PHONE_PATTERN = /^\+?[0-9]{8,15}$/
+const cleanPhone = (value) => value.replace(/[\s.\-()]/g, '')
 
 const FIELDS = [
   { key: 'fullName', label: 'Họ tên', autoComplete: 'name', max: 100 },
   { key: 'email', label: 'Email', type: 'email', autoComplete: 'email', max: 100 },
+  { key: 'phone', label: 'Số điện thoại', type: 'tel', autoComplete: 'tel', max: 20 },
   { key: 'password', label: 'Mật khẩu (8-72 ký tự)', type: 'password', autoComplete: 'new-password', max: 72 },
   { key: 'confirm', label: 'Nhập lại mật khẩu', type: 'password', autoComplete: 'new-password', max: 72 },
 ]
@@ -20,6 +23,8 @@ function validate(form) {
   if (!form.fullName.trim()) errors.fullName = 'Không được để trống'
   if (!form.email.trim()) errors.email = 'Không được để trống'
   else if (!EMAIL_PATTERN.test(form.email.trim())) errors.email = 'Email không hợp lệ'
+  if (!form.phone.trim()) errors.phone = 'Không được để trống'
+  else if (!PHONE_PATTERN.test(cleanPhone(form.phone))) errors.phone = 'Số điện thoại không hợp lệ (8-15 chữ số)'
   if (form.password.length < 8) errors.password = 'Ít nhất 8 ký tự'
   else if (form.password.length > 72) errors.password = 'Tối đa 72 ký tự'
   if (form.confirm !== form.password) errors.confirm = 'Mật khẩu nhập lại không khớp'
@@ -30,7 +35,7 @@ function validate(form) {
 export default function RegisterPage() {
   const { isAuthenticated, role, login } = useAuth()
   const navigate = useNavigate()
-  const [form, setForm] = useState({ fullName: '', email: '', password: '', confirm: '' })
+  const [form, setForm] = useState({ fullName: '', email: '', phone: '', password: '', confirm: '' })
   const [fieldErrors, setFieldErrors] = useState({})
   const [error, setError] = useState(null)
   const [submitting, setSubmitting] = useState(false)
@@ -56,6 +61,7 @@ export default function RegisterPage() {
       const session = await authApi.register({
         fullName: form.fullName.trim(),
         email: form.email.trim(),
+        phone: cleanPhone(form.phone),
         password: form.password,
       })
       login(session.token, session.fullName, session.role, session.username)

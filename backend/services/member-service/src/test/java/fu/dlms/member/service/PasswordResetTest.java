@@ -203,7 +203,7 @@ class PasswordResetTest {
         when(members.findByLibraryCardNo("TV-0007")).thenReturn(Optional.of(member));
         when(jwt.issue(any(Member.class))).thenReturn(new IssuedToken("member-jwt", now.plusSeconds(3600)));
 
-        var response = service.register(new RegisterRequest("Lê Văn An", "an@example.com", "my-secret-pass"));
+        var response = service.register(new RegisterRequest("Lê Văn An", "an@example.com", "0912 345 678", "my-secret-pass"));
 
         assertThat(response.token()).isEqualTo("member-jwt");
         assertThat(response.role()).isEqualTo("MEMBER");

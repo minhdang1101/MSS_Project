@@ -98,9 +98,9 @@ public class AuthServiceImpl implements AuthService {
         if (request.password().getBytes(StandardCharsets.UTF_8).length > BCRYPT_MAX_BYTES) {
             throw new BusinessException("Mật khẩu tối đa 72 byte (tiếng Việt có dấu tính nhiều byte hơn).");
         }
-        // MemberRequest cleans the phone number and the other fields the same way the librarian's form does.
+        // MemberRequest cleans the fields the same way the librarian's form does.
         MemberResponse created = memberService.register(
-                new MemberRequest(request.fullName(), request.email(), null), request.password());
+                new MemberRequest(request.fullName(), request.email(), request.phone()), request.password());
         Member member = memberRepository.findByLibraryCardNo(created.libraryCardNo()).orElseThrow();
         return accountLogin(member);
     }

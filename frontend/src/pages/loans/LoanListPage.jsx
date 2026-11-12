@@ -146,6 +146,14 @@ export default function LoanListPage() {
     },
   ]
 
+  // The slip shows one loan: the one being handled, or else this member's unreturned loan of the chosen book.
+  const slipLoans = useMemo(() => {
+    if (focus.current != null) return loans.filter((l) => l.id === focus.current)
+    const open = loans.find((l) => l.bookId === focus.bookId && l.memberId === focus.memberId
+      && l.status !== 'RETURNED')
+    return open ? [open] : []
+  }, [loans, focus])
+
   const slipBook = books.find((b) => b.id === focus.bookId)
     ?? (focus.bookId != null ? { id: focus.bookId, title: `Sách #${focus.bookId}`, isbn: '' } : null)
 
@@ -173,7 +181,7 @@ export default function LoanListPage() {
             )}
           </div>
           <DueSlip book={slipBook} member={members.find((m) => m.id === focus.memberId)}
-            loans={loans.filter((l) => l.bookId === focus.bookId)} current={focus.current} fresh={focus.fresh}
+            loans={slipLoans} current={focus.current} fresh={focus.fresh}
             preview={mode === 'return' && returning != null} />
         </div>
 
