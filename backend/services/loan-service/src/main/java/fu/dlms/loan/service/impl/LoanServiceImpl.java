@@ -87,7 +87,7 @@ public class LoanServiceImpl implements LoanService {
      * <ol>
      *   <li>A key that was already used returns its loan (double click, network retry).</li>
      *   <li>Member must be ACTIVE (member-service).</li>
-     *   <li>Book must be lendable; reserve one copy in book-catalog-service with the same key.</li>
+     *   <li>Book must be lendable; reserve the scanned copy (barcode) in book-catalog-service with the same key.</li>
      *   <li>Save the BORROWED loan and its LoanCreated outbox event in one transaction.</li>
      *   <li>If that save fails, release the reservation so the copy is available again.</li>
      * </ol>
@@ -108,8 +108,13 @@ public class LoanServiceImpl implements LoanService {
         }
         BookView book = bookCatalogClient.getBook(request.bookId());
         requireLendable(book);
+        String barcode = request.barcode() == null || request.barcode().isBlank() ? null : request.barcode().trim();
+        if (loanTypeOf(book) == LoanType.PHYSICAL && barcode == null) {
+            throw new BusinessException("Sách in: hãy quét mã vạch dán trên bản sách để biết đưa cuốn nào.");
+        }
 
-        ReservationView reservation = bookCatalogClient.reserve(request.bookId(), new ReservationRequest(key, member.id()));
+        ReservationView reservation = bookCatalogClient.reserve(request.bookId(),
+                new ReservationRequest(key, member.id(), loanTypeOf(book) == LoanType.PHYSICAL ? barcode : null));
         try {
             Loan saved = transactionTemplate.execute(tx -> {
                 Loan loan = loanRepository.saveAndFlush(newLoan(request, book, reservation));
